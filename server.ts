@@ -29,24 +29,6 @@ function cleanSchema(obj: any): any {
   return newObj;
 }
 
-// In-memory rate limiting map for /api/brain
-interface RateLimitRecord {
-  count: number;
-  dateKey: string;
-}
-const brainRateLimitMap = new Map<string, RateLimitRecord>();
-
-const getDailyRateLimit = (): number => {
-  const envVal = process.env.BRAIN_DAILY_RATE_LIMIT;
-  if (envVal) {
-    const parsed = parseInt(envVal, 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-  // Now the primary interpretation path (not just a fallback), so the default needs
-  // real headroom — override with BRAIN_DAILY_RATE_LIMIT once free-tier users are live.
-  return 2000; // Default limit per session/IP per day
-};
-
 // Health check route
 const SERVER_BUILD_VERSION = "2026.07.27.0315";
 app.get("/api/health", (_req, res) => {
@@ -64,29 +46,8 @@ app.post("/api/brain", async (req, res) => {
   try {
     const { message, healthContextSnapshot, sessionId } = req.body;
 
-    // Rate Limiting (LOOP 5)
-    const clientKey = (sessionId && typeof sessionId === "string" && sessionId.trim())
-      ? `session:${sessionId.trim()}`
-      : `ip:${req.ip || req.socket.remoteAddress || "unknown"}`;
-
-    const todayDateKey = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-    const limit = getDailyRateLimit();
-
-    const record = brainRateLimitMap.get(clientKey);
-    if (record && record.dateKey === todayDateKey) {
-      if (record.count >= limit) {
-        return res.status(429).json({
-          error: "RATE_LIMIT_EXCEEDED",
-          message: `Limite diário de requisições do Cérebro OMNI excedido (${limit} chamadas/dia). Tente novamente amanhã.`,
-          limit,
-          currentUsage: record.count
-        });
-      }
-      record.count += 1;
-    } else {
-      brainRateLimitMap.set(clientKey, { count: 1, dateKey: todayDateKey });
-    }
-
+    // No artificial daily cap here — each user's own GEMINI_API_KEY is the only
+    // limit that matters (Google throttles/zeroes it out on their end if abused).
     // Exclusively use server process.env.GEMINI_API_KEY
     const envKey = process.env.GEMINI_API_KEY?.trim();
     if (!envKey || envKey === "null" || envKey === "undefined" || envKey.startsWith("YOUR_")) {
