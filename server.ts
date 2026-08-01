@@ -42,7 +42,9 @@ const getDailyRateLimit = (): number => {
     const parsed = parseInt(envVal, 10);
     if (!isNaN(parsed) && parsed > 0) return parsed;
   }
-  return 100; // Production default limit per session/IP per day
+  // Now the primary interpretation path (not just a fallback), so the default needs
+  // real headroom — override with BRAIN_DAILY_RATE_LIMIT once free-tier users are live.
+  return 2000; // Default limit per session/IP per day
 };
 
 // Health check route
@@ -114,9 +116,9 @@ app.post("/api/brain", async (req, res) => {
       };
     });
 
-    const systemInstruction = `Você é o Cérebro do Assistente de Saúde e Nutrição OMNI.
+    const systemInstruction = `Você é o Cérebro do Assistente de Saúde e Nutrição OMNI — a ÚNICA camada de interpretação do app. O aplicativo não tem lógica própria de entendimento de linguagem natural nem de cálculo nutricional/médico: tudo isso é sua responsabilidade. O app só grava exatamente os parâmetros que você retornar.
 Você tem acesso ao estado atual do usuário fornecido no snapshot.
-Sua função é interpretar o pedido do usuário e invocar as ferramentas (tools) adequadas para registrar, atualizar ou remover dados nos domínios correspondentes.
+Sua função é interpretar o pedido do usuário (por mais informal, incompleto ou ambíguo que seja) e invocar as ferramentas (tools) adequadas para registrar, atualizar ou remover dados nos domínios correspondentes.
 
 SNAPSHOT DO CONTEXTO DE SAÚDE ATUAL:
 ${JSON.stringify(healthContextSnapshot || {}, null, 2)}
@@ -125,7 +127,13 @@ DIRETRIZES DE USO DAS TOOLS:
 1. Para cada pedido de alteração de dados (água, refeições, treinos, histórico médico, aderência a remédios, agenda, perfil, metas, saúde mental, notificações), escolha e execute a ferramenta específica com os parâmetros corretos.
 2. Se a mensagem do usuário contiver pedidos para múltiplos domínios (ex: água + peso + treino), você DEVE invocar a ferramenta correspondente para CADA UM dos pedidos na mesma resposta.
 3. Se o pedido for apenas informativo, uma conversa geral ou tira-dúvidas sem alteração de estado, não invoque nenhuma ferramenta e responda diretamente.
-4. Mantenha os valores coerentes com os parâmetros pedidos. Exemplo: "mude meu peso para 82kg" -> profile_tool(action="updateProfile", weight=82). "beba 500ml de água" -> water_tool(action="addWaterLog", amount=500).`;
+4. Mantenha os valores coerentes com os parâmetros pedidos. Exemplo: "mude meu peso para 82kg" -> profile_tool(action="updateProfile", weight=82). "beba 500ml de água" -> water_tool(action="addWaterLog", amount=500).
+5. FAÇA VOCÊ MESMO todo cálculo e normalização — nunca deixe um campo numérico em branco esperando que o app calcule depois:
+   - Refeições: se o usuário descrever um alimento/prato sem valores exatos ("comi um sanduíche de atum", "2 ovos mexidos"), estime calorias, proteína, carboidratos e gordura usando seu conhecimento nutricional e porções padrão, e preencha esses campos na mealsTool. Só deixe em branco se for genuinamente impossível estimar.
+   - Unidades: converta tudo para a unidade que a tool espera (litros/copos -> ml; libras -> kg; etc.), nunca passe a unidade errada adiante.
+   - Medicamentos: normalize nome (sem verbos/data/hora dentro do nome), dosagem e horário faltante (padrão razoável se não informado) antes de chamar medical_history_tool.
+   - Datas: "hoje"/"ontem"/"amanhã"/"dia X" — resolva sempre para uma data absoluta (YYYY-MM-DD) antes de enviar; nunca repasse texto relativo cru.
+6. Se o pedido tiver informação insuficiente para uma ação seguramente correta (ex: falta identificar qual registro remover entre vários parecidos), use needsClarification=true e clarificationQuestion em vez de adivinhar.`;
 
     const modelsToTry = ["gemini-2.0-flash"];
     let response: any = null;

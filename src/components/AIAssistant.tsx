@@ -333,8 +333,9 @@ export default function AIAssistant() {
         return;
       }
 
-      // 1. Direct Base Central Query Orchestrator (Bypasses Gemini when exact data exists)
-      const orchestratorResult = classifyAndExecuteQuery(messageText, {
+      // Build the local-orchestrator context once — it's the fallback if the AI
+      // call below fails or the user has no working API key, not the first attempt.
+      const localOrchestratorContext = {
         profile,
         waterLogs,
         meals,
@@ -360,19 +361,12 @@ export default function AIAssistant() {
         deleteEvent,
         updateProfile,
         toggleDarkMode
-      });
+      };
 
-      if (orchestratorResult.handledLocally && orchestratorResult.responseContent) {
-        const finalMessages: ChatMessage[] = [
-          ...newMessages,
-          { id: (Date.now() + 1).toString(), role: 'assistant', content: orchestratorResult.responseContent }
-        ];
-        updateActiveSessionMessages(finalMessages);
-        setIsTyping(false);
-        return;
-      }
-
-      // 2. Call ADK Brain Endpoint (/api/brain)
+      // 1. AI Brain Endpoint (/api/brain) is the PRIMARY interpreter — it does all
+      // the language understanding and the math (nutrition estimates, unit
+      // conversions, date resolution). The local regex orchestrator only takes
+      // over below, as a fallback, if this fails (no key, offline, rate limit).
       const healthContextSnapshot = {
         profile: anonymizeProfile(profile),
         waterLogs,
@@ -383,24 +377,44 @@ export default function AIAssistant() {
         goals
       };
 
-      const brainRes = await fetch('/api/brain', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: messageText,
-          healthContextSnapshot,
-          sessionId: activeSession.id
-        })
-      });
+      let brainData: any;
+      try {
+        const brainRes = await fetch('/api/brain', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: messageText,
+            healthContextSnapshot,
+            sessionId: activeSession.id
+          })
+        });
 
-      if (!brainRes.ok) {
-        const errJson = await brainRes.json().catch(() => ({}));
-        throw new Error(errJson.message || `Erro no Cérebro (${brainRes.status})`);
+        if (!brainRes.ok) {
+          const errJson = await brainRes.json().catch(() => ({}));
+          throw new Error(errJson.message || `Erro no Cérebro (${brainRes.status})`);
+        }
+
+        brainData = await brainRes.json();
+      } catch (aiError: any) {
+        // The AI is the primary interpreter now — the local regex orchestrator only
+        // steps in here, as a fallback, when it genuinely couldn't be reached
+        // (offline, no/invalid API key, rate limit). It's the "ou se a IA não
+        // entender" branch, not the default path.
+        const orchestratorResult = classifyAndExecuteQuery(messageText, localOrchestratorContext);
+        if (orchestratorResult.handledLocally && orchestratorResult.responseContent) {
+          const fallbackMessages: ChatMessage[] = [
+            ...newMessages,
+            { id: (Date.now() + 1).toString(), role: 'assistant', content: orchestratorResult.responseContent }
+          ];
+          updateActiveSessionMessages(fallbackMessages);
+          setIsTyping(false);
+          return;
+        }
+        throw aiError; // local fallback couldn't handle it either — surface the original AI error
       }
 
-      const brainData = await brainRes.json();
       const operations: any[] = brainData.operations || [];
       const brainReply: string = brainData.reply || "";
 
