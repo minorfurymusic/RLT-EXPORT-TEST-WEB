@@ -6,7 +6,11 @@ import { HEALTH_CONDITIONS_DATA, HealthCategory, Condition } from '../data/healt
 import { SelectedCondition } from '../types';
 import { cn } from '../lib/utils';
 
-export default function HealthConditionsManager() {
+interface HealthConditionsManagerProps {
+  onComplete?: () => void;
+}
+
+export default function HealthConditionsManager({ onComplete }: HealthConditionsManagerProps = {}) {
   const { profile, updateProfile, t } = useHealth();
   const [isAdding, setIsAdding] = useState(false);
   const [step, setStep] = useState<'category' | 'condition' | 'details'>('category');
@@ -58,6 +62,7 @@ export default function HealthConditionsManager() {
       selectedConditions: [...selectedConditions, newCondition]
     });
     setIsAdding(false);
+    onComplete?.();
   };
 
   const handleRemove = (id: string) => {

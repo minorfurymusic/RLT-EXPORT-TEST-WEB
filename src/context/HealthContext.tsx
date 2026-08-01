@@ -18,8 +18,9 @@ interface HealthContextType {
   notifications: Notification[];
   events: CalendarEvent[];
   profile: UserProfile;
+  avatar: string | null;
   appLanguage: Language;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   goals: HealthGoal[];
   meals: Meal[];
   waterLogs: WaterLog[];
@@ -75,6 +76,7 @@ interface HealthContextType {
   deleteRoutine: (id: string) => void;
   // Gym Log CRUD
   addGymLog: (log: Omit<GymWorkoutLog, 'id'>) => void;
+  updateGymLog: (id: string, log: Partial<GymWorkoutLog>) => void;
   deleteGymLog: (id: string) => void;
   // Activity Tracking CRUD
   addActivity: (activity: ActivityTracking) => void;
@@ -101,7 +103,7 @@ interface HealthContextType {
   performanceSnapshots: PerformanceSnapshot[];
   generateDailyPerformanceSnapshot: () => Promise<PerformanceSnapshot>;
   getPerformanceSnapshotByDate: (date: string) => PerformanceSnapshot | undefined;
-  exportData: () => void;
+  exportData: () => string;
   clearNutritionMediaCache: () => void;
   generateDebugLog: () => void;
   aiProviderConfig: AIProviderConfig | null;
@@ -281,8 +283,8 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     return (profile.language as Language) || 'pt-BR';
   });
 
-  const t = useCallback((key: string) => {
-    return getTranslation(appLanguage, key);
+  const t = useCallback((key: string, params?: Record<string, string | number>) => {
+    return getTranslation(appLanguage, key, params);
   }, [appLanguage]);
 
   useEffect(() => {

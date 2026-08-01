@@ -7,7 +7,7 @@ import { useHealth } from '../context/HealthContext';
 
 export default function Insights() {
   const navigate = useNavigate();
-  const { goals, userProfile, t } = useHealth();
+  const { goals, profile, t } = useHealth();
 
   const dynamicInsights = useMemo(() => {
     const list = [];
@@ -93,7 +93,7 @@ export default function Insights() {
     }
 
     return list;
-  }, [goals, userProfile, t]);
+  }, [goals, profile, t]);
 
   return (
     <div className="flex flex-col min-h-full bg-white dark:bg-slate-950">

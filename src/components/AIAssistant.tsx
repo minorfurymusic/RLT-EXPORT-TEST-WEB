@@ -445,7 +445,9 @@ export default function AIAssistant() {
               protein: Number(payload.protein) || 0,
               carbs: Number(payload.carbs) || 0,
               fat: Number(payload.fat) || 0,
-              date: payload.date || new Date().toISOString()
+              date: payload.date || new Date().toISOString(),
+              time: payload.time || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              portionSize: payload.portionSize || ''
             };
             addMeal(mealData);
             appliedLogs.push(`• **Nutrição:** Refeição "${mealData.description}" (${mealData.calories} kcal, ${mealData.protein}g proteína) adicionada`);
@@ -463,7 +465,9 @@ export default function AIAssistant() {
               muscleGroup: payload.muscleGroup || 'Chest',
               sets: payload.sets || [],
               notes: payload.notes || '',
-              date: payload.date || new Date().toISOString()
+              date: payload.date || new Date().toISOString(),
+              exerciseId: payload.exerciseId || `custom-${Date.now()}`,
+              caloriesBurned: Number(payload.caloriesBurned) || 0
             };
             addGymLog(gymData);
             appliedLogs.push(`• **Treino:** Exercício "${gymData.exerciseName}" (${gymData.muscleGroup}) registrado`);

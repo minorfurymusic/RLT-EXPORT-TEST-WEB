@@ -51,6 +51,9 @@ export interface UserProfile {
   goal?: 'Muscle Gain' | 'Weight Loss' | 'Maintenance' | 'Health';
   biometricEnabled?: boolean;
   language?: string;
+  selectedConditions?: SelectedCondition[];
+  customWaterGoal?: number;
+  todaySteps?: number;
 }
 
 export interface RadarChartAxes {
@@ -396,6 +399,7 @@ export interface WaterLog {
   amount: number; // in ml
   time: string;
   date: string; // ISO string
+  type?: 'water' | 'coffee' | 'alcohol';
 }
 
 export interface ExerciseRoutine {

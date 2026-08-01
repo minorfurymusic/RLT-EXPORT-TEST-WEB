@@ -2127,10 +2127,16 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
 };
 
 
-export function getTranslation(lang: Language, key: string): string {
-  return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['pt-BR']?.[key] || TRANSLATIONS['en-US']?.[key] || key;
+export function getTranslation(lang: Language, key: string, params?: Record<string, string | number>): string {
+  let text = TRANSLATIONS[lang]?.[key] || TRANSLATIONS['pt-BR']?.[key] || TRANSLATIONS['en-US']?.[key] || key;
+  if (params) {
+    for (const [paramKey, value] of Object.entries(params)) {
+      text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(value));
+    }
+  }
+  return text;
 }
 
-export function t(lang: Language, key: string): string {
-  return getTranslation(lang, key);
+export function t(lang: Language, key: string, params?: Record<string, string | number>): string {
+  return getTranslation(lang, key, params);
 }

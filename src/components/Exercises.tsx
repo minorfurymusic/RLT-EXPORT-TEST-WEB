@@ -333,8 +333,8 @@ export default function Exercises() {
                   if (r.id === 'step-goal-permanent') return false;
                   if (r.isExtra) return true;
                   const today = new Date().toLocaleDateString(appLanguage, { weekday: 'long' });
-                  if (r.repeat === 'Every day' || r.repeat === t('exercises.everyDay')) return true;
-                  if ((r.repeat === 'Monday-Friday' || r.repeat === t('exercises.monFri')) && !['Saturday', 'Sunday'].includes(today)) return true;
+                  if (typeof r.repeat === 'string' && (r.repeat === 'Every day' || r.repeat === t('exercises.everyDay'))) return true;
+                  if (typeof r.repeat === 'string' && (r.repeat === 'Monday-Friday' || r.repeat === t('exercises.monFri')) && !['Saturday', 'Sunday'].includes(today)) return true;
                   if (Array.isArray(r.repeat) && r.repeat.includes(today)) return true;
                   return false;
                 }).map(routine => (
@@ -644,34 +644,6 @@ export default function Exercises() {
                 addGymLog({ ...log, id: editingLog.id });
               } else {
                 addGymLog(log);
-                // Also add to history as a quick session
-                const newSession: GymWorkoutSession = {
-                  id: Math.random().toString(36).substr(2, 9),
-                  date: new Date().toISOString(),
-                  name: `Quick: ${log.exerciseName}`,
-                  exercises: [{
-                    exerciseId: log.exerciseId,
-                    exerciseName: log.exerciseName,
-                    muscleGroup: log.muscleGroup,
-                    sets: log.sets,
-                    caloriesBurned: log.caloriesBurned,
-                    duration: log.duration,
-                    totalVolume: log.totalVolume
-                  }],
-                  totalCalories: log.caloriesBurned,
-                  totalDuration: log.duration,
-                  totalVolume: log.totalVolume
-                };
-                addHistoryRecord({
-                  id: newSession.id,
-                  date: newSession.date,
-                  category: 'Exercise',
-                  title: newSession.name,
-                  value: `${newSession.totalCalories} kcal`,
-                  unit: 'kcal',
-                  details: `${newSession.exercises.length} exercises • ${newSession.totalVolume}kg total`,
-                  icon: 'FitnessCenter'
-                });
               }
               setIsGymLogOpen(false);
               setSelectedExerciseForLog(null);
