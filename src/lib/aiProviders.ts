@@ -19,6 +19,8 @@ export interface AIProviderPreset {
   kind: AIProviderKind;
   baseUrl: string;
   defaultModel: string;
+  /** tried once, automatically, if defaultModel comes back "not found" / deprecated — providers retire model names over time */
+  fallbackModel?: string;
   keyHint: string;
   keyDocsUrl?: string;
   /** true when baseUrl/model should be freely editable in the UI (Gemini/OpenAI/etc have sane fixed defaults) */
@@ -31,7 +33,8 @@ export const AI_PROVIDER_PRESETS: Record<AIProviderId, AIProviderPreset> = {
     label: 'Google Gemini',
     kind: 'openai-compat',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.6-flash',
+    fallbackModel: 'gemini-flash-latest',
     keyHint: 'AIzaSy... ou AQ...',
     keyDocsUrl: 'https://aistudio.google.com/app/apikey'
   },

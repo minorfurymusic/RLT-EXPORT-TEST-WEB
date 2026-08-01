@@ -142,16 +142,34 @@ async function callAnthropic(p: Required<Pick<CallProviderParams, 'apiKey' | 'ba
   return { text, toolCalls };
 }
 
+function isModelNotFoundError(err: any): boolean {
+  const s = String(err?.message || err).toLowerCase();
+  return s.includes('404') || s.includes('not_found') || s.includes('no longer available') || s.includes('model not found') || s.includes('does not exist') || s.includes('invalid model');
+}
+
 async function callAIProvider(params: CallProviderParams): Promise<ProviderResult> {
   const preset = AI_PROVIDER_PRESETS[params.provider] || AI_PROVIDER_PRESETS.custom;
   const baseUrl = (params.baseUrl && params.baseUrl.trim()) || preset.baseUrl;
   const model = (params.model && params.model.trim()) || preset.defaultModel;
-  const resolved = { ...params, baseUrl, model };
 
   if (!baseUrl) throw new Error('Nenhum endpoint configurado para este provedor.');
   if (!model) throw new Error('Nenhum modelo configurado para este provedor.');
 
-  return preset.kind === 'anthropic' ? callAnthropic(resolved) : callOpenAICompat(resolved);
+  const call = (m: string) => {
+    const resolved = { ...params, baseUrl, model: m };
+    return preset.kind === 'anthropic' ? callAnthropic(resolved) : callOpenAICompat(resolved);
+  };
+
+  try {
+    return await call(model);
+  } catch (err: any) {
+    // Providers retire model names over time (this is exactly what happened with
+    // gemini-2.5-flash) — retry once with the preset's fallback before giving up.
+    if (preset.fallbackModel && preset.fallbackModel !== model && isModelNotFoundError(err)) {
+      return await call(preset.fallbackModel);
+    }
+    throw err;
+  }
 }
 
 function resolveApiKey(bodyKey: unknown): string | null {
