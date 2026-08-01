@@ -5,12 +5,13 @@ import { useHealth } from '../context/HealthContext';
 import { ChevronRight, Camera, Trash2, ImageIcon, X, Plus, User, Info, Target, Settings, Check, Beef, Droplets, Footprints, Flame, Walk, Stethoscope, Medication, Utensils, Lightbulb, FitnessCenter, Moon, Sun, FileText, Lock, Globe, HelpCircle, Download, Smartphone, CheckCircle2, Key, LogOut, Eye, EyeOff, AlertCircle } from './Icons';
 import { cn, safeLocalStorage } from '../lib/utils';
 import { UserProfile, HealthGoal } from '../types';
+import { AI_PROVIDER_PRESETS, type AIProviderId } from '../lib/aiProviders';
 import HealthConditionsManager from './HealthConditionsManager';
 import Modal from './Modal';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { profile, updateProfile, goals, updateGoal, avatar, setAvatar, darkMode, toggleDarkMode, exportData, t, isGeminiKeyConfigured, appLanguage, logout, geminiApiKey, saveGeminiApiKey, openPermissionsModal } = useHealth();
+  const { profile, updateProfile, goals, updateGoal, avatar, setAvatar, darkMode, toggleDarkMode, exportData, t, isAiConfigured, appLanguage, logout, aiProviderConfig, saveAiProviderConfig, openPermissionsModal } = useHealth();
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isPersonalInfoModalOpen, setIsPersonalInfoModalOpen] = useState(false);
@@ -19,15 +20,23 @@ export default function Profile() {
   const [showExportFallback, setShowExportFallback] = useState(false);
   const [exportJson, setExportJson] = useState('');
   const [copied, setCopied] = useState(false);
-  const [keyValue, setKeyValue] = useState(geminiApiKey || '');
+  const [selectedProvider, setSelectedProvider] = useState<AIProviderId>(aiProviderConfig?.provider || 'gemini');
+  const [keyValue, setKeyValue] = useState(aiProviderConfig?.apiKey || '');
+  const [baseUrlValue, setBaseUrlValue] = useState(aiProviderConfig?.baseUrl || '');
+  const [modelValue, setModelValue] = useState(aiProviderConfig?.model || '');
   const [showKey, setShowKey] = useState(false);
   const [keyError, setKeyError] = useState('');
   const [keySuccess, setKeySuccess] = useState(false);
   const [isKeyExpanded, setIsKeyExpanded] = useState(false);
 
   useEffect(() => {
-    setKeyValue(geminiApiKey || '');
-  }, [geminiApiKey]);
+    setSelectedProvider(aiProviderConfig?.provider || 'gemini');
+    setKeyValue(aiProviderConfig?.apiKey || '');
+    setBaseUrlValue(aiProviderConfig?.baseUrl || '');
+    setModelValue(aiProviderConfig?.model || '');
+  }, [aiProviderConfig]);
+
+  const selectedPreset = AI_PROVIDER_PRESETS[selectedProvider];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,12 +298,12 @@ export default function Profile() {
                       <Key className="size-4" />
                     </div>
                     <span className="font-medium text-slate-700 dark:text-slate-300 group-hover:text-primary text-sm">
-                      {appLanguage === 'pt-BR' ? 'Configuração da API Gemini' : 'Gemini API Setup'}
+                      {appLanguage === 'pt-BR' ? 'Assistente de IA' : 'AI Assistant'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-slate-400">
-                      {isGeminiKeyConfigured ? (appLanguage === 'pt-BR' ? 'Ativo' : 'Active') : (appLanguage === 'pt-BR' ? 'Não configurado' : 'Not configured')}
+                      {isAiConfigured ? (aiProviderConfig ? AI_PROVIDER_PRESETS[aiProviderConfig.provider].label : '') : (appLanguage === 'pt-BR' ? 'Não configurado' : 'Not configured')}
                     </span>
                     <ChevronRight className={cn("size-4 text-slate-400 transition-transform duration-200", isKeyExpanded && "rotate-90")} />
                   </div>
@@ -310,13 +319,43 @@ export default function Profile() {
                       className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-4"
                     >
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        {appLanguage === 'pt-BR' 
-                          ? 'O RLT utiliza esta chave para habilitar o Smart Scan de exames, o Assistente de IA e as análises de nutrição/exercícios de forma local e segura.' 
-                          : 'RLT uses this key to enable exam Smart Scan, AI Assistant, and nutrition/exercise analyses locally and securely.'
+                        {appLanguage === 'pt-BR'
+                          ? 'O RLT usa a IA que você escolher aqui pra tudo: Cérebro (chat), Smart Scan de exames e análises de nutrição/exercícios. Qualquer provedor com chave de API funciona — a chave fica só no seu dispositivo.'
+                          : 'RLT uses whichever AI you pick here for everything: the Cérebro chat, exam Smart Scan, and nutrition/exercise analysis. Any provider with an API key works — the key stays only on your device.'
                         }
                       </p>
 
                       <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                          {appLanguage === 'pt-BR' ? 'Provedor' : 'Provider'}
+                        </label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {Object.values(AI_PROVIDER_PRESETS).map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProvider(preset.id);
+                                setKeyError('');
+                                setKeySuccess(false);
+                              }}
+                              className={cn(
+                                "py-2 px-2.5 rounded-lg text-[11px] font-bold text-left transition-all border",
+                                selectedProvider === preset.id
+                                  ? "bg-primary border-primary text-white"
+                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                          {appLanguage === 'pt-BR' ? 'Chave de API' : 'API Key'}
+                        </label>
                         <div className="relative">
                           <input
                             type={showKey ? 'text' : 'password'}
@@ -326,7 +365,7 @@ export default function Profile() {
                               setKeyError('');
                               setKeySuccess(false);
                             }}
-                            placeholder="AIzaSy..."
+                            placeholder={selectedPreset.keyHint}
                             className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary font-mono text-slate-800 dark:text-slate-200"
                           />
                           <button
@@ -337,6 +376,28 @@ export default function Profile() {
                             {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                           </button>
                         </div>
+
+                        {selectedPreset.editableEndpoint && (
+                          <input
+                            type="text"
+                            value={baseUrlValue}
+                            onChange={(e) => { setBaseUrlValue(e.target.value); setKeyError(''); setKeySuccess(false); }}
+                            placeholder={appLanguage === 'pt-BR' ? 'URL base (compatível com OpenAI), ex: https://api.exemplo.com/v1' : 'Base URL (OpenAI-compatible), e.g. https://api.example.com/v1'}
+                            className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary font-mono text-slate-800 dark:text-slate-200"
+                          />
+                        )}
+
+                        <input
+                          type="text"
+                          value={modelValue}
+                          onChange={(e) => { setModelValue(e.target.value); setKeyError(''); setKeySuccess(false); }}
+                          placeholder={
+                            selectedPreset.defaultModel
+                              ? (appLanguage === 'pt-BR' ? `Modelo (opcional) — padrão: ${selectedPreset.defaultModel}` : `Model (optional) — default: ${selectedPreset.defaultModel}`)
+                              : (appLanguage === 'pt-BR' ? 'Modelo' : 'Model')
+                          }
+                          className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary font-mono text-slate-800 dark:text-slate-200"
+                        />
 
                         {keyError && (
                           <div className="flex items-center gap-1 text-[10px] font-medium text-red-500 mt-1">
@@ -363,18 +424,20 @@ export default function Profile() {
                               setKeyError(appLanguage === 'pt-BR' ? 'Por favor, insira uma chave.' : 'Please enter a key.');
                               return;
                             }
-                            if (trimmed.length < 20) {
+                            if (trimmed.length < 8) {
                               setKeyError(appLanguage === 'pt-BR' ? 'Chave muito curta.' : 'Key is too short.');
                               return;
                             }
-                            const lowerKey = trimmed.toLowerCase();
-                            if (!lowerKey.startsWith('aizasy') && !lowerKey.startsWith('alzasy') && !lowerKey.startsWith('aq')) {
-                              if (trimmed.length < 25) {
-                                setKeyError(appLanguage === 'pt-BR' ? 'A chave deve ser uma API Key do Gemini (ex: AIzaSy... ou AQ...).' : 'Key must be a Gemini API Key (e.g., AIzaSy... or AQ...).');
-                                return;
-                              }
+                            if (selectedPreset.editableEndpoint && !baseUrlValue.trim()) {
+                              setKeyError(appLanguage === 'pt-BR' ? 'Informe a URL base do provedor personalizado.' : 'Enter the custom provider\'s base URL.');
+                              return;
                             }
-                            saveGeminiApiKey(trimmed);
+                            saveAiProviderConfig({
+                              provider: selectedProvider,
+                              apiKey: trimmed,
+                              baseUrl: baseUrlValue.trim() || undefined,
+                              model: modelValue.trim() || undefined
+                            });
                             setKeySuccess(true);
                           }}
                           className="flex-1 py-2 px-3 bg-primary text-white rounded-xl font-bold text-xs shadow-md shadow-primary/10 active:scale-95 transition-all flex items-center justify-center gap-1"
@@ -383,12 +446,14 @@ export default function Profile() {
                           {appLanguage === 'pt-BR' ? 'Salvar' : 'Save'}
                         </button>
 
-                        {isGeminiKeyConfigured && (
+                        {isAiConfigured && (
                           <button
                             type="button"
                             onClick={() => {
-                              saveGeminiApiKey('');
+                              saveAiProviderConfig(null);
                               setKeyValue('');
+                              setBaseUrlValue('');
+                              setModelValue('');
                               setKeyError('');
                               setKeySuccess(false);
                             }}
@@ -400,20 +465,22 @@ export default function Profile() {
                         )}
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 leading-relaxed">
-                        {appLanguage === 'pt-BR' 
-                          ? 'Não tem uma chave? Crie uma 100% gratuita clicando no link:' 
-                          : 'No key yet? Create one 100% free by clicking the link:'
-                        }
-                        <a
-                          href="https://aistudio.google.com/app/apikey"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block mt-1 font-bold text-primary hover:underline"
-                        >
-                          {appLanguage === 'pt-BR' ? 'Obter Chave de API Grátis ↗' : 'Get Free API Key ↗'}
-                        </a>
-                      </div>
+                      {selectedPreset.keyDocsUrl && (
+                        <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 leading-relaxed">
+                          {appLanguage === 'pt-BR'
+                            ? `Não tem uma chave da ${selectedPreset.label}? Crie uma clicando no link:`
+                            : `No ${selectedPreset.label} key yet? Create one by clicking the link:`
+                          }
+                          <a
+                            href={selectedPreset.keyDocsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block mt-1 font-bold text-primary hover:underline"
+                          >
+                            {appLanguage === 'pt-BR' ? `Obter Chave da ${selectedPreset.label} ↗` : `Get ${selectedPreset.label} Key ↗`}
+                          </a>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

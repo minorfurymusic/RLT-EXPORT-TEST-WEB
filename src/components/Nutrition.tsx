@@ -14,7 +14,7 @@ export default function Nutrition() {
   const location = useLocation();
   const autoScanTriggered = useRef(false);
 
-  const { t, meals, addMeal, updateMeal, deleteMeal, getTodayValue, getDailyCalorieTarget, isDayEnded, endDay, reopenDay, selectedDate: contextDate, setSelectedDate: setContextDate, appLanguage, isGeminiKeyConfigured } = useHealth();
+  const { t, meals, addMeal, updateMeal, deleteMeal, getTodayValue, getDailyCalorieTarget, isDayEnded, endDay, reopenDay, selectedDate: contextDate, setSelectedDate: setContextDate, appLanguage, isAiConfigured } = useHealth();
 
   const [view, setView] = useState<'main' | 'history' | 'daily'>('main');
   const [localSelectedDate, setLocalSelectedDate] = useState<string>(contextDate);
@@ -73,11 +73,11 @@ export default function Nutrition() {
   const handleAnalyzeMeal = async () => {
     if (!mealInput && selectedImages.length === 0) return;
     
-    if (!isGeminiKeyConfigured) {
+    if (!isAiConfigured) {
       setAnalysisError(
         appLanguage === 'pt-BR'
-          ? 'Análise de IA inativa. Configure sua chave Gemini na aba de Configurações para habilitar a análise de fotos e descrição.'
-          : 'AI analysis inactive. Configure your Gemini key in the Settings tab to enable photo and description analysis.'
+          ? 'Análise de IA inativa. Configure sua IA na aba de Configurações para habilitar a análise de fotos e descrição.'
+          : 'AI analysis inactive. Configure your AI provider in the Settings tab to enable photo and description analysis.'
       );
       return;
     }
@@ -201,14 +201,14 @@ export default function Nutrition() {
       if (isNoKeyError) {
         setAnalysisError(
           appLanguage === 'pt-BR'
-            ? 'Nenhuma chave de API do Gemini configurada neste navegador. Por favor, vá em Perfil > Configuração da API Gemini e salve sua chave.'
-            : 'No Gemini API Key configured in this browser. Please go to Profile > Gemini API Configuration and save your key.'
+            ? 'Nenhuma chave de API de IA configurada neste navegador. Por favor, vá em Perfil > Assistente de IA e salve sua chave.'
+            : 'No AI API Key configured in this browser. Please go to Profile > AI Assistant and save your key.'
         );
       } else if (isAuthError) {
         setAnalysisError(
           appLanguage === 'pt-BR'
-            ? 'Chave de API inválida ou expirada. Por favor, verifique a chave do Gemini em Perfil > Configurações.'
-            : 'Invalid or expired API Key. Please verify your Gemini key in Profile > Settings.'
+            ? 'Chave de API inválida ou expirada. Por favor, verifique sua chave em Perfil > Assistente de IA.'
+            : 'Invalid or expired API Key. Please verify your key in Profile > AI Assistant.'
         );
       } else {
         setAnalysisError(
@@ -631,12 +631,12 @@ export default function Nutrition() {
                     </div>
                   ) : (
                     <>
-                      {!isGeminiKeyConfigured && (
+                      {!isAiConfigured && (
                         <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-2xl flex flex-col gap-2 shrink-0 mb-2">
                           <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-                            {appLanguage === 'pt-BR' 
-                              ? 'O RLT depende de uma chave do Google AI Studio para processar imagens e textos de forma autônoma.' 
-                              : 'RLT depends on a Google AI Studio API key to process images and texts autonomously.'}
+                            {appLanguage === 'pt-BR'
+                              ? 'O RLT depende de uma chave de API de IA (Gemini, OpenAI, Claude, DeepSeek, Kimi ou outra) para processar imagens e textos de forma autônoma.'
+                              : 'RLT depends on an AI API key (Gemini, OpenAI, Claude, DeepSeek, Kimi, or another) to process images and texts autonomously.'}
                           </p>
                           <button
                             onClick={() => navigate('/profile')}

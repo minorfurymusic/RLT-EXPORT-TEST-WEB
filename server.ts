@@ -1,9 +1,10 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { allBrainTools } from "./src/lib/brainTools";
+import { toOpenAITool, toAnthropicTool, type BrainTool } from "./src/lib/toolSchema";
+import { AI_PROVIDER_PRESETS, type AIProviderId } from "./src/lib/aiProviders";
 
 dotenv.config();
 
@@ -17,16 +18,171 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // Helper for async delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper to sanitize Zod schema for Gemini API (removes exclusiveMinimum / exclusiveMaximum)
-function cleanSchema(obj: any): any {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(cleanSchema);
-  const newObj: any = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === 'exclusiveMinimum' || key === 'exclusiveMaximum') continue;
-    newObj[key] = cleanSchema(value);
+// ===========================================================================
+// PROVIDER-AGNOSTIC AI GATEWAY
+//
+// Every provider the user might plug in a key for (Gemini, OpenAI, DeepSeek,
+// Kimi/Moonshot, "Personalizado") speaks the OpenAI Chat Completions request
+// shape — that's the de facto standard now, so one adapter covers all of them
+// by just varying baseUrl/model. Anthropic's Messages API has a different
+// enough shape (system param, content blocks, tool_use blocks) to need its
+// own adapter. Both normalize down to the same { text, toolCalls } result so
+// the two route handlers below don't need to know which provider answered.
+// ===========================================================================
+
+interface ProviderImage {
+  mimeType: string;
+  data: string; // base64, no "data:" prefix
+}
+
+interface CallProviderParams {
+  provider: AIProviderId;
+  apiKey: string;
+  baseUrl?: string;
+  model?: string;
+  systemInstruction?: string;
+  userText: string;
+  images?: ProviderImage[];
+  tools?: BrainTool[];
+  jsonMode?: boolean;
+}
+
+interface ProviderResult {
+  text: string;
+  toolCalls: { name: string; args: any }[];
+}
+
+async function callOpenAICompat(p: Required<Pick<CallProviderParams, 'apiKey' | 'baseUrl' | 'model'>> & CallProviderParams): Promise<ProviderResult> {
+  const contentParts: any[] = [];
+  if (p.userText) contentParts.push({ type: 'text', text: p.userText });
+  for (const img of p.images || []) {
+    contentParts.push({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.data}` } });
   }
-  return newObj;
+
+  const messages: any[] = [];
+  if (p.systemInstruction) messages.push({ role: 'system', content: p.systemInstruction });
+  messages.push({ role: 'user', content: contentParts.length > 1 ? contentParts : p.userText });
+
+  const body: any = { model: p.model, messages };
+  if (p.tools && p.tools.length > 0) {
+    body.tools = p.tools.map(toOpenAITool);
+    body.tool_choice = 'auto';
+  }
+  if (p.jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetch(`${p.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p.apiKey}` },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Provider error (${res.status}): ${errText.slice(0, 500)}`);
+  }
+
+  const data = await res.json();
+  const msg = data.choices?.[0]?.message || {};
+  const toolCalls = (msg.tool_calls || []).map((tc: any) => {
+    let args: any = {};
+    try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { /* leave empty on malformed args */ }
+    return { name: tc.function?.name, args };
+  });
+
+  return { text: msg.content || '', toolCalls };
+}
+
+async function callAnthropic(p: Required<Pick<CallProviderParams, 'apiKey' | 'baseUrl' | 'model'>> & CallProviderParams): Promise<ProviderResult> {
+  const contentParts: any[] = [];
+  for (const img of p.images || []) {
+    contentParts.push({ type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.data } });
+  }
+  contentParts.push({ type: 'text', text: p.userText });
+
+  let system = p.systemInstruction;
+  if (p.jsonMode) {
+    system = `${system ? system + '\n\n' : ''}Responda SOMENTE com um JSON válido, sem nenhum texto, comentário ou markdown ao redor.`;
+  }
+
+  const body: any = {
+    model: p.model,
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: contentParts }]
+  };
+  if (system) body.system = system;
+  if (p.tools && p.tools.length > 0) {
+    body.tools = p.tools.map(toAnthropicTool);
+  }
+
+  const res = await fetch(`${p.baseUrl.replace(/\/$/, '')}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': p.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Provider error (${res.status}): ${errText.slice(0, 500)}`);
+  }
+
+  const data = await res.json();
+  let text = '';
+  const toolCalls: { name: string; args: any }[] = [];
+  for (const block of data.content || []) {
+    if (block.type === 'text') text += block.text;
+    else if (block.type === 'tool_use') toolCalls.push({ name: block.name, args: block.input });
+  }
+
+  return { text, toolCalls };
+}
+
+async function callAIProvider(params: CallProviderParams): Promise<ProviderResult> {
+  const preset = AI_PROVIDER_PRESETS[params.provider] || AI_PROVIDER_PRESETS.custom;
+  const baseUrl = (params.baseUrl && params.baseUrl.trim()) || preset.baseUrl;
+  const model = (params.model && params.model.trim()) || preset.defaultModel;
+  const resolved = { ...params, baseUrl, model };
+
+  if (!baseUrl) throw new Error('Nenhum endpoint configurado para este provedor.');
+  if (!model) throw new Error('Nenhum modelo configurado para este provedor.');
+
+  return preset.kind === 'anthropic' ? callAnthropic(resolved) : callOpenAICompat(resolved);
+}
+
+function resolveApiKey(bodyKey: unknown): string | null {
+  const key = (typeof bodyKey === 'string' ? bodyKey : '').trim() || process.env.GEMINI_API_KEY?.trim() || '';
+  if (!key || key === 'null' || key === 'undefined' || key.startsWith('YOUR_') || key.startsWith('MY_GEM')) return null;
+  return key;
+}
+
+function isTransientError(err: any): boolean {
+  const s = String(err?.message || err).toLowerCase();
+  return s.includes('429') || s.includes('503') || s.includes('quota') || s.includes('demand') || s.includes('overloaded') || s.includes('resource_exhausted');
+}
+
+// Gemini's SDK-shaped `contents` (still the wire format the client sends, since
+// only server.ts and the provider adapters need to know about other providers)
+// — pull out the plain text and any inline images.
+function extractTextAndImages(contents: any): { text: string; images: ProviderImage[] } {
+  let text = '';
+  const images: ProviderImage[] = [];
+  const items = Array.isArray(contents) ? contents : [contents];
+  for (const item of items) {
+    if (typeof item === 'string') { text += (text ? '\n' : '') + item; continue; }
+    const parts = item?.parts || (item?.text ? [{ text: item.text }] : []);
+    for (const part of parts) {
+      if (part?.text) text += (text ? '\n' : '') + part.text;
+      if (part?.inlineData?.data) {
+        images.push({ mimeType: part.inlineData.mimeType || 'image/jpeg', data: part.inlineData.data });
+      }
+    }
+  }
+  return { text, images };
 }
 
 // Health check route
@@ -41,19 +197,18 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// ADK Brain Endpoint (LOOP 4 & LOOP 5)
+// Brain Endpoint — the Cérebro's natural-language interpreter. Provider-agnostic:
+// whichever provider/key the client sends drives the tool-calling.
 app.post("/api/brain", async (req, res) => {
   try {
-    const { message, healthContextSnapshot, sessionId } = req.body;
+    const { message, healthContextSnapshot, sessionId, provider, apiKey, baseUrl, model } = req.body;
 
-    // No artificial daily cap here — each user's own GEMINI_API_KEY is the only
-    // limit that matters (Google throttles/zeroes it out on their end if abused).
-    // Exclusively use server process.env.GEMINI_API_KEY
-    const envKey = process.env.GEMINI_API_KEY?.trim();
-    if (!envKey || envKey === "null" || envKey === "undefined" || envKey.startsWith("YOUR_")) {
+    const resolvedProvider: AIProviderId = (provider as AIProviderId) || 'gemini';
+    const resolvedKey = resolveApiKey(apiKey);
+    if (!resolvedKey) {
       return res.status(401).json({
         error: "NO_API_KEY",
-        message: "Variável GEMINI_API_KEY do servidor não configurada no ambiente."
+        message: "Nenhuma chave de API de IA configurada. Configure a sua em Perfil > Assistente de IA."
       });
     }
 
@@ -63,19 +218,6 @@ app.post("/api/brain", async (req, res) => {
         message: "O parâmetro 'message' é obrigatório."
       });
     }
-
-    const ai = new GoogleGenAI({ apiKey: envKey });
-
-    const toolMap = new Map();
-    allBrainTools.forEach(t => toolMap.set(t.name, t));
-
-    const functionDeclarations = allBrainTools.map(t => {
-      const decl = t._getDeclaration();
-      return {
-        ...decl,
-        parameters: cleanSchema(decl.parameters)
-      };
-    });
 
     const systemInstruction = `Você é o Cérebro do Assistente de Saúde e Nutrição OMNI — a ÚNICA camada de interpretação do app. O aplicativo não tem lógica própria de entendimento de linguagem natural nem de cálculo nutricional/médico: tudo isso é sua responsabilidade. O app só grava exatamente os parâmetros que você retornar.
 Você tem acesso ao estado atual do usuário fornecido no snapshot.
@@ -96,66 +238,48 @@ DIRETRIZES DE USO DAS TOOLS:
    - Datas: "hoje"/"ontem"/"amanhã"/"dia X" — resolva sempre para uma data absoluta (YYYY-MM-DD) antes de enviar; nunca repasse texto relativo cru.
 6. Se o pedido tiver informação insuficiente para uma ação seguramente correta (ex: falta identificar qual registro remover entre vários parecidos), use needsClarification=true e clarificationQuestion em vez de adivinhar.`;
 
-    const modelsToTry = ["gemini-2.0-flash"];
-    let response: any = null;
+    let result: ProviderResult | null = null;
     let lastError: any = null;
-
-    for (const modelName of modelsToTry) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          response = await ai.models.generateContent({
-            model: modelName,
-            contents: [
-              { role: "user", parts: [{ text: message }] }
-            ],
-            config: {
-              systemInstruction,
-              tools: [{ functionDeclarations }]
-            }
-          });
-          if (response) break;
-        } catch (err: any) {
-          lastError = err;
-          const errStr = String(err?.message || err).toLowerCase();
-          const isTransient = errStr.includes("429") || errStr.includes("503") || errStr.includes("quota") || errStr.includes("resource_exhausted");
-          if (isTransient && attempt === 0) {
-            await delay(1500);
-          } else {
-            break;
-          }
-        }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        result = await callAIProvider({
+          provider: resolvedProvider,
+          apiKey: resolvedKey,
+          baseUrl,
+          model,
+          systemInstruction,
+          userText: message,
+          tools: allBrainTools
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        if (isTransientError(err) && attempt === 0) await delay(1500); else break;
       }
-      if (response) break;
     }
 
-    if (!response) {
-      console.error("All Gemini models failed in /api/brain:", lastError);
-      return res.status(500).json({
+    if (!result) {
+      console.error("AI provider failed in /api/brain:", lastError);
+      return res.status(isTransientError(lastError) ? 429 : 500).json({
         error: "BRAIN_ERROR",
-        message: lastError?.message || "Erro no Cérebro ADK ao processar modelos de IA."
+        message: lastError?.message || "Erro no Cérebro ao processar a mensagem."
       });
     }
 
-    const functionCalls = response.functionCalls || [];
+    const toolMap = new Map(allBrainTools.map(t => [t.name, t]));
     const operations: any[] = [];
-    const mockToolContext = {} as any;
-
-    for (const call of functionCalls) {
+    for (const call of result.toolCalls) {
       const tool = toolMap.get(call.name);
-      if (tool) {
-        try {
-          const result = await tool.runAsync({
-            args: call.args as any,
-            toolContext: mockToolContext
-          });
-          operations.push(result);
-        } catch (err: any) {
-          console.error(`Error running tool ${call.name}:`, err);
-        }
+      if (!tool) continue;
+      try {
+        const parsedArgs = tool.schema.parse(call.args);
+        operations.push(await tool.execute(parsedArgs));
+      } catch (err: any) {
+        console.error(`Error running tool ${call.name}:`, err);
       }
     }
 
-    const reply = response.text || (operations.length > 0
+    const reply = result.text || (operations.length > 0
       ? `Operações identificadas pelo Cérebro OMNI: ${operations.length} ação(ões).`
       : "Processado pelo Cérebro OMNI.");
 
@@ -173,110 +297,71 @@ DIRETRIZES DE USO DAS TOOLS:
   }
 });
 
-// Centralized Proxy Endpoint for Gemini API with Automatic Key Fallback & Retries
-app.post("/api/gemini", async (req, res) => {
+// Generic content-generation proxy (Smart Scan OCR, medication insights, meal-photo
+// analysis, routine suggestions, etc). Provider-agnostic like /api/brain — the client
+// keeps sending Gemini-SDK-shaped `contents`/`config` (nothing about the ~6 components
+// that call this needed to change), and this endpoint translates that into whichever
+// provider the user configured.
+app.post("/api/ai", async (req, res) => {
   try {
-    const customKey = req.headers["x-gemini-api-key"] as string | undefined;
-    const envKey = process.env.GEMINI_API_KEY?.trim();
+    const { provider, apiKey, baseUrl, model, contents, config } = req.body;
 
-    const keysToTry: string[] = [];
-    if (customKey && customKey.trim() && customKey !== "null" && customKey !== "undefined") {
-      keysToTry.push(customKey.trim());
-    }
-    if (envKey && envKey !== "null" && envKey !== "undefined" && !envKey.startsWith("YOUR_") && !envKey.startsWith("MY_GEM")) {
-      if (!keysToTry.includes(envKey)) {
-        keysToTry.push(envKey);
-      }
-    }
-
-    if (keysToTry.length === 0) {
+    const resolvedProvider: AIProviderId = (provider as AIProviderId) || 'gemini';
+    const resolvedKey = resolveApiKey(apiKey);
+    if (!resolvedKey) {
       return res.status(401).json({
         error: "NO_API_KEY",
-        message: "Nenhuma chave da API Gemini foi configurada (nem chave customizada do usuário, nem variável GEMINI_API_KEY do servidor)."
+        message: "Nenhuma chave de API de IA configurada. Configure a sua em Perfil > Assistente de IA."
       });
     }
-
-    let { model = "gemini-2.5-flash", contents, config } = req.body;
 
     if (!contents) {
       return res.status(400).json({
         error: "MISSING_CONTENTS",
-        message: "O parâmetro 'contents' é obrigatório para realizar a chamada ao Gemini."
+        message: "O parâmetro 'contents' é obrigatório para realizar a chamada de IA."
       });
     }
 
-    // Prepare candidate models using valid Gemini API aliases
-    const defaultModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"];
-    const modelsToTry: string[] = [];
-    if (model && typeof model === "string") {
-      modelsToTry.push(model);
-    }
-    for (const fallbackModel of defaultModels) {
-      if (!modelsToTry.includes(fallbackModel)) {
-        modelsToTry.push(fallbackModel);
-      }
-    }
+    const { text, images } = extractTextAndImages(contents);
+    const jsonMode = config?.responseMimeType === 'application/json';
 
-    let response: any = null;
+    let result: ProviderResult | null = null;
     let lastError: any = null;
-
-    // Try keys x models x retries
-    for (const apiKey of keysToTry) {
-      for (const targetModel of modelsToTry) {
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const ai = new GoogleGenAI({ apiKey });
-            response = await ai.models.generateContent({
-              model: targetModel,
-              contents,
-              config,
-            });
-            if (response) break;
-          } catch (err: any) {
-            lastError = err;
-            const errStr = String(err?.message || err).toLowerCase();
-            const isTransient = errStr.includes("503") || errStr.includes("high demand") || errStr.includes("unavailable") || errStr.includes("429") || errStr.includes("quota") || errStr.includes("resource_exhausted");
-
-            console.warn(`Attempt ${attempt + 1} with key (${apiKey.substring(0, 6)}...) and model (${targetModel}) failed:`, err?.message || err);
-
-            if (isTransient && attempt === 0) {
-              // Wait 1.5s before retrying transient quota/demand error
-              await delay(1500);
-            } else {
-              break; // Try next model or next key
-            }
-          }
-        }
-        if (response) break;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        result = await callAIProvider({
+          provider: resolvedProvider,
+          apiKey: resolvedKey,
+          baseUrl,
+          model,
+          systemInstruction: config?.systemInstruction,
+          userText: text,
+          images,
+          jsonMode
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        if (isTransientError(err) && attempt === 0) await delay(1500); else break;
       }
-      if (response) break;
     }
 
-    if (response) {
-      return res.json({
-        text: response.text,
-        candidates: response.candidates,
-        usageMetadata: response.usageMetadata
-      });
+    if (result) {
+      return res.json({ text: result.text, candidates: [], usageMetadata: null });
     }
 
-    console.error("All available Gemini API keys failed. Last error:", lastError);
+    console.error("AI provider failed in /api/ai:", lastError);
     const errorMessage = lastError?.message || String(lastError);
-    const isPermissionDenied = errorMessage.toLowerCase().includes("permission") || errorMessage.toLowerCase().includes("forbidden") || lastError?.status === 403;
-    const isNotFound = errorMessage.toLowerCase().includes("not_found") || errorMessage.toLowerCase().includes("not found") || lastError?.status === 404;
-    const isQuotaOrRateLimit = errorMessage.includes("429") || errorMessage.includes("503") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("demand") || errorMessage.toLowerCase().includes("resource_exhausted");
+    const transient = isTransientError(lastError);
 
-    const userFriendlyMessage = isQuotaOrRateLimit
-      ? "O serviço de IA do Gemini atingiu temporariamente o limite de requisições por minuto ou está sob alta demanda. Por favor, aguarde alguns instantes e tente novamente."
-      : errorMessage;
-
-    return res.status(lastError?.status || (isQuotaOrRateLimit ? 429 : 500)).json({
-      error: isPermissionDenied ? "PERMISSION_DENIED" : (isNotFound ? "NOT_FOUND" : (isQuotaOrRateLimit ? "RATE_LIMIT_EXCEEDED" : "GEMINI_ERROR")),
-      message: userFriendlyMessage,
-      details: lastError?.details || null
+    return res.status(transient ? 429 : 500).json({
+      error: transient ? "RATE_LIMIT_EXCEEDED" : "AI_PROVIDER_ERROR",
+      message: transient
+        ? "O provedor de IA atingiu temporariamente o limite de requisições ou está sob alta demanda. Aguarde e tente novamente."
+        : errorMessage
     });
   } catch (error: any) {
-    console.error("Error in /api/gemini proxy endpoint:", error);
+    console.error("Error in /api/ai proxy endpoint:", error);
     return res.status(500).json({
       error: "INTERNAL_SERVER_ERROR",
       message: error?.message || "Erro interno no servidor ao processar chamada de IA."

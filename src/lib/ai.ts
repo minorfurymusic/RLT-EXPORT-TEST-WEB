@@ -1,81 +1,53 @@
-import { GoogleGenAI } from "@google/genai";
 import { jsonrepair } from "jsonrepair";
 import { redactImagePII } from "./lgpd";
 import { logError } from "./logger";
-import { safeLocalStorage } from "./utils";
+import { loadAIProviderConfig, resolveEndpoint } from "./aiProviders";
 
+/**
+ * Provider-agnostic AI client. The key never leaves the browser except inside
+ * this request to our own /api/ai proxy — there's no client-side SDK fallback
+ * anymore (there used to be a direct Google SDK call here, which meant a
+ * build-time GEMINI_API_KEY got baked into the JS bundle in plain text; that
+ * risk is gone now that every call goes through the server).
+ */
 export function getGoogleGenAI(): any {
   return {
     models: {
       generateContent: async (params: { model?: string; contents: any; config?: any }) => {
-        let localKey = safeLocalStorage.getItem('gemini_api_key');
-        if (localKey) {
-          localKey = localKey.trim();
-          if (localKey === "null" || localKey === "undefined" || localKey === "") {
-            localKey = null;
-          }
-        }
+        const stored = loadAIProviderConfig();
+        const { baseUrl, model } = stored ? resolveEndpoint(stored) : { baseUrl: undefined, model: undefined };
 
-        try {
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          if (localKey) {
-            headers['x-gemini-api-key'] = localKey;
-          }
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: stored?.provider,
+            apiKey: stored?.apiKey,
+            baseUrl,
+            model: params.model || model,
+            contents: params.contents,
+            config: params.config
+          }),
+        });
 
-          const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(params),
-          });
+        const data = await response.json();
 
-          const data = await response.json();
-
-          if (!response.ok) {
-            const errorMsg = data.message || `Erro ao chamar a API Gemini (${response.status})`;
-            logError({
-              type: 'ai',
-              module: 'Gemini Proxy /api/gemini',
-              message: errorMsg,
-              metadata: { status: response.status, model: params?.model },
-            });
-            throw new Error(errorMsg);
-          }
-
-          return {
-            text: data.text || "",
-            candidates: data.candidates || [],
-            usageMetadata: data.usageMetadata || null,
-          };
-        } catch (fetchErr: any) {
-          console.warn("Backend proxy /api/gemini error, attempting direct client SDK fallback...", fetchErr);
-          
-          const envKey = process.env.GEMINI_API_KEY?.trim();
-          const activeKey = localKey || (envKey && !envKey.startsWith("YOUR_") ? envKey : "");
-          if (activeKey) {
-            try {
-              const directAi = new GoogleGenAI({ apiKey: activeKey });
-              return await directAi.models.generateContent(params as any);
-            } catch (directErr: any) {
-              logError({
-                type: 'ai',
-                module: 'Gemini Client SDK Fallback',
-                message: directErr.message || 'Error executing direct Gemini call',
-                stack: directErr.stack,
-              });
-              throw directErr;
-            }
-          }
-
+        if (!response.ok) {
+          const errorMsg = data.message || `Erro ao chamar a IA (${response.status})`;
           logError({
             type: 'ai',
-            module: 'Gemini AI Engine',
-            message: fetchErr.message || 'Failed to generate content with Gemini',
-            stack: fetchErr.stack,
+            module: 'AI Proxy /api/ai',
+            message: errorMsg,
+            metadata: { status: response.status, model: params?.model, provider: stored?.provider },
           });
-          throw fetchErr;
+          throw new Error(errorMsg);
         }
+
+        return {
+          text: data.text || "",
+          candidates: data.candidates || [],
+          usageMetadata: data.usageMetadata || null,
+        };
       }
     }
   };
@@ -240,8 +212,6 @@ export function safeJsonParse<T>(text: string, defaultValue: T): T {
 
 export async function extractMedicalData(files: { data: string, mimeType: string }[], language: string = 'pt-BR') {
   try {
-    const model = "gemini-3.6-flash";
-    
     // LGPD & Multimodal pre-processing: Detect exact mimeType for PDF, TXT or Images
     const redactedFiles = await Promise.all(files.map(async f => {
       let effectiveMime = f.mimeType;
@@ -349,7 +319,6 @@ export async function extractMedicalData(files: { data: string, mimeType: string
 
     const ai = getGoogleGenAI();
     const result = await ai.models.generateContent({
-      model,
       contents: [
         {
           parts: [
@@ -376,7 +345,6 @@ export async function extractMedicalData(files: { data: string, mimeType: string
 
 export async function generateMedicationInsights(medicationName: string, dosage: string, language: string = 'pt-BR') {
   try {
-    const model = "gemini-3.6-flash";
     const prompt = `
       Você é um assistente farmacêutico especializado.
       Gere um resumo de "Cuidados e Observações" para o seguinte medicamento:
@@ -398,7 +366,6 @@ export async function generateMedicationInsights(medicationName: string, dosage:
 
     const ai = getGoogleGenAI();
     const result = await ai.models.generateContent({
-      model,
       contents: [{ parts: [{ text: prompt }] }],
     });
 

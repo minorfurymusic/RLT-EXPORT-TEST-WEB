@@ -4,6 +4,7 @@ import { cleanAiResponse, safeJsonParse, generateMedicationInsights, getGoogleGe
 import { anonymizeProfile } from '../lib/lgpd';
 import { Language, getTranslation } from '../lib/i18n';
 import { safeLocalStorage } from '../lib/utils';
+import { loadAIProviderConfig, saveAIProviderConfig, type AIProviderConfig } from '../lib/aiProviders';
 
 import { sensorService } from '../services/sensorService';
 import { googleSignIn, logoutGoogle, createGoogleEvent, deleteGoogleEvent, fetchGoogleEvents, setAccessToken } from '../services/googleCalendarService';
@@ -103,9 +104,9 @@ interface HealthContextType {
   exportData: () => void;
   clearNutritionMediaCache: () => void;
   generateDebugLog: () => void;
-  geminiApiKey: string | null;
-  saveGeminiApiKey: (key: string | null) => void;
-  isGeminiKeyConfigured: boolean;
+  aiProviderConfig: AIProviderConfig | null;
+  saveAiProviderConfig: (config: AIProviderConfig | null) => void;
+  isAiConfigured: boolean;
 }
 
 const HealthContext = createContext<HealthContextType | undefined>(undefined);
@@ -223,21 +224,16 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [googleAccessToken]);
 
-  const [geminiApiKey, setGeminiApiKey] = useState<string | null>(() => {
-    return safeLocalStorage.getItem('gemini_api_key');
+  const [aiProviderConfig, setAiProviderConfig] = useState<AIProviderConfig | null>(() => {
+    return loadAIProviderConfig();
   });
 
-  const saveGeminiApiKey = (key: string | null) => {
-    if (key) {
-      safeLocalStorage.setItem('gemini_api_key', key.trim());
-      setGeminiApiKey(key.trim());
-    } else {
-      safeLocalStorage.removeItem('gemini_api_key');
-      setGeminiApiKey(null);
-    }
+  const saveAiProviderConfig = (config: AIProviderConfig | null) => {
+    saveAIProviderConfig(config);
+    setAiProviderConfig(config && config.apiKey.trim() ? config : null);
   };
 
-  const isGeminiKeyConfigured = true;
+  const isAiConfigured = !!aiProviderConfig;
 
   const [profile, setProfile] = useState<UserProfile>(() => {
     const saved = safeLocalStorage.getItem('health_profile');
@@ -2061,9 +2057,9 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       getPerformanceSnapshotByDate,
       clearNutritionMediaCache,
       generateDebugLog,
-      geminiApiKey,
-      saveGeminiApiKey,
-      isGeminiKeyConfigured
+      aiProviderConfig,
+      saveAiProviderConfig,
+      isAiConfigured
     }}>
       <SystemPermissionsModal isOpen={isPermissionsModalOpen} onClose={closePermissionsModal} />
       {children}

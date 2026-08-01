@@ -1,5 +1,5 @@
-import { FunctionTool } from '@google/adk';
 import { z } from 'zod';
+import type { BrainTool } from './toolSchema';
 
 export interface BrainToolResult<T = any> {
   domain: string;
@@ -16,10 +16,10 @@ function extractPayload<T extends Record<string, any>>(args: T): Record<string, 
 }
 
 // 1. WATER TOOL
-export const waterTool = new FunctionTool({
+export const waterTool: BrainTool = {
   name: 'water_tool',
   description: 'Gerencia registros de consumo de água (addWaterLog, deleteWaterLog)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addWaterLog', 'deleteWaterLog']),
     id: z.string().optional(),
     amount: z.number().optional(),
@@ -43,13 +43,13 @@ export const waterTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 2. MEALS TOOL
-export const mealsTool = new FunctionTool({
+export const mealsTool: BrainTool = {
   name: 'meals_tool',
   description: 'Gerencia refeições e nutrição (addMeal, updateMeal, deleteMeal)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addMeal', 'updateMeal', 'deleteMeal']),
     id: z.string().optional(),
     description: z.string().optional(),
@@ -80,13 +80,13 @@ export const mealsTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 3. GYM / EXERCISE TOOL
-export const gymTool = new FunctionTool({
+export const gymTool: BrainTool = {
   name: 'gym_tool',
   description: 'Gerencia treinos, exercícios e rotinas de exercícios (addGymLog, addRoutine, updateRoutine)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addGymLog', 'addRoutine', 'updateRoutine']),
     id: z.string().optional(),
     exerciseName: z.string().optional(),
@@ -124,13 +124,13 @@ export const gymTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 4. MEDICAL_HISTORY TOOL
-export const medicalHistoryTool = new FunctionTool({
+export const medicalHistoryTool: BrainTool = {
   name: 'medical_history_tool',
   description: 'Gerencia histórico médico, exames, consultas, emergência, histórico familiar, relatórios de estresse, medicação contínua, sinais vitais e atestados (addHistoryRecord, updateHistoryRecord, deleteHistoryRecord)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addHistoryRecord', 'updateHistoryRecord', 'deleteHistoryRecord']),
     id: z.string().optional(),
     category: z.enum([
@@ -234,13 +234,13 @@ export const medicalHistoryTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 5. ADHERENCE TOOL
-export const adherenceTool = new FunctionTool({
+export const adherenceTool: BrainTool = {
   name: 'adherence_tool',
   description: 'Gerencia aderência a medicações/hábitos (toggleAdherence)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['toggleAdherence']),
     medicationId: z.string(),
     date: z.string(),
@@ -258,13 +258,13 @@ export const adherenceTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 6. AGENDA TOOL
-export const agendaTool = new FunctionTool({
+export const agendaTool: BrainTool = {
   name: 'agenda_tool',
   description: 'Gerencia eventos de agenda e compromissos de saúde (addEvent, updateEvent, deleteEvent)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addEvent', 'updateEvent', 'deleteEvent']),
     id: z.string().optional(),
     title: z.string().optional(),
@@ -293,13 +293,13 @@ export const agendaTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 7. PROFILE TOOL
-export const profileTool = new FunctionTool({
+export const profileTool: BrainTool = {
   name: 'profile_tool',
   description: 'Atualiza perfil do usuário e métricas físicas (updateProfile)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['updateProfile']),
     name: z.string().optional(),
     email: z.string().email().optional(),
@@ -324,13 +324,13 @@ export const profileTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 8. GOALS TOOL
-export const goalsTool = new FunctionTool({
+export const goalsTool: BrainTool = {
   name: 'goals_tool',
   description: 'Atualiza metas de saúde e progresso (updateGoal)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['updateGoal']),
     id: z.string(),
     current: z.number().optional(),
@@ -351,13 +351,13 @@ export const goalsTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 9. MENTAL_HEALTH TOOL
-export const mentalHealthTool = new FunctionTool({
+export const mentalHealthTool: BrainTool = {
   name: 'mental_health_tool',
   description: 'Registra respostas de acompanhamento de saúde mental (addMentalHealthResponse)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addMentalHealthResponse']),
     date: z.string(),
     answers: z.array(z.object({
@@ -378,13 +378,13 @@ export const mentalHealthTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
 // 10. NOTIFICATIONS TOOL
-export const notificationsTool = new FunctionTool({
+export const notificationsTool: BrainTool = {
   name: 'notifications_tool',
   description: 'Cria notificações no sistema (addNotification)',
-  parameters: z.object({
+  schema: z.object({
     action: z.enum(['addNotification']),
     title: z.string(),
     description: z.string(),
@@ -404,9 +404,9 @@ export const notificationsTool = new FunctionTool({
       clarificationQuestion: args.clarificationQuestion
     };
   }
-});
+};
 
-export const allBrainTools = [
+export const allBrainTools: BrainTool[] = [
   waterTool,
   mealsTool,
   gymTool,

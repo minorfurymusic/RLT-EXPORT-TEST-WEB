@@ -566,7 +566,7 @@ export default function AIAssistant() {
       let displayContent = '';
       if (isQuotaOrRateLimit) {
         displayContent = `⚠️ **STATUS DO MOTOR CENTRAL RLT (RATE LIMIT TEMPORÁRIO)**\n\n` +
-          `O serviço de IA do Gemini atingiu o limite de requisições por minuto na nuvem.\n\n` +
+          `O provedor de IA configurado atingiu o limite de requisições por minuto na nuvem.\n\n` +
           `📋 **RESUMO RÁPIDO DA SUA BASE CENTRAL DE HOJE:**\n` +
           `• **Água:** ${totalWaterMl} ml / ${Math.round(getDailyWaterTarget() * 1000)} ml\n` +
           `• **Nutrição:** ${totalCaloriesEaten} kcal / ${Math.round(getDailyCalorieTarget())} kcal\n` +

@@ -1264,7 +1264,7 @@ function CardioRoutineEditor({ routine, onBack, onComplete }: { routine: Exercis
 }
 
 function OtherRoutineEditor({ routine, onBack, onComplete }: { routine: ExerciseRoutine, onBack: () => void, onComplete: (activity: ActivityTracking) => void }) {
-  const { t, profile, isGeminiKeyConfigured, appLanguage } = useHealth();
+  const { t, profile, isAiConfigured, appLanguage } = useHealth();
   const [name, setName] = useState(routine.name === 'Other' ? '' : routine.name);
   const [duration, setDuration] = useState(30);
   const [isEstimating, setIsEstimating] = useState(false);
@@ -1274,8 +1274,8 @@ function OtherRoutineEditor({ routine, onBack, onComplete }: { routine: Exercise
   const estimateCalories = async () => {
     if (!name || name.length < 3) return;
 
-    if (!isGeminiKeyConfigured) {
-      alert(appLanguage === 'pt-BR' ? 'Por favor, configure sua chave Gemini do Google AI Studio nas Configurações de Perfil.' : 'Please configure your Google AI Studio Gemini Key in Profile Settings.');
+    if (!isAiConfigured) {
+      alert(appLanguage === 'pt-BR' ? 'Por favor, configure sua IA nas Configurações de Perfil.' : 'Please configure your AI provider in Profile Settings.');
       return;
     }
 
