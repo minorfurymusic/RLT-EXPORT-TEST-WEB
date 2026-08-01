@@ -1,0 +1,12 @@
+{
+  "name": "Real Life Track",
+  "description": "A comprehensive health and wellness companion with AI-powered insights, nutrition tracking, and exercise logging.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

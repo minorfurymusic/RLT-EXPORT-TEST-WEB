@@ -1,0 +1,113 @@
+{
+  "id": "com.reallifetrack.app",
+  "name": "Real Life Track",
+  "short_name": "Real Life Track",
+  "description": "Rastreamento inteligente de saúde, nutrição e hábitos em tempo real com assistente IA.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "iarc_rating_id": "e58c170d-03f8-450f-a362-0c156f4d89a4",
+  "categories": ["health", "fitness", "medical", "lifestyle"],
+  "prefer_related_applications": true,
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.reallifetrack.app",
+      "url": "https://play.google.com/store/apps/details?id=com.reallifetrack.app"
+    }
+  ],
+  "share_target": {
+    "action": "/?share=true",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Painel Principal Real Life Track"
+    },
+    {
+      "src": "/screenshot-mobile-2.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Métricas de Saúde e Atividades"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Registrar Água",
+      "short_name": "Água",
+      "description": "Adicionar registro de consumo de água",
+      "url": "/water",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Ver Atividades",
+      "short_name": "Exercícios",
+      "description": "Ver contagem de passos e rotinas de treino",
+      "url": "/exercises",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Exames & Atestados",
+      "short_name": "Exames",
+      "description": "Gerenciar exames de saúde e atestados com OCR IA",
+      "url": "/medical",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
