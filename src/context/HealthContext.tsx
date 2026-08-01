@@ -1924,14 +1924,26 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     const medEvents: CalendarEvent[] = [];
     continuousMeds.forEach(med => {
       if (!med.isActive) return;
-      
-      // Generate for a 3-month window around selectedDate for performance and coverage
+
+      // Generate for a 3-month window around selectedDate for performance and coverage,
+      // clamped to the medication's own prescription (start) and validity (end) dates —
+      // otherwise every continuous medication shows up on every day in the window,
+      // including days before it was even prescribed.
       const centerDate = new Date(selectedDate + 'T12:00:00');
-      const startDate = new Date(centerDate);
-      startDate.setMonth(startDate.getMonth() - 1);
-      const endDate = new Date(centerDate);
-      endDate.setMonth(endDate.getMonth() + 1);
-      
+      const windowStart = new Date(centerDate);
+      windowStart.setMonth(windowStart.getMonth() - 1);
+      const windowEnd = new Date(centerDate);
+      windowEnd.setMonth(windowEnd.getMonth() + 1);
+
+      const medStart = new Date(new Date(med.prescriptionDate).toDateString());
+      const medEndRaw = med.validityDate || med.endDate;
+      const medEnd = medEndRaw ? new Date(new Date(medEndRaw).toDateString()) : null;
+
+      const startDate = medStart > windowStart ? medStart : windowStart;
+      const endDate = medEnd && medEnd < windowEnd ? medEnd : windowEnd;
+
+      if (startDate > endDate) return; // starts after this window, or already past its validity date
+
       let current = new Date(startDate);
       while (current <= endDate) {
         const dateStr = current.toISOString().split('T')[0];

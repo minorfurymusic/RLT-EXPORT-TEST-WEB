@@ -134,6 +134,7 @@ export interface DomainParsedPlan {
   medName?: string;
   dosage?: string;
   startDateIso?: string;
+  medTimeStr?: string;
   
   // Profile
   weightProfile?: number;
@@ -265,7 +266,10 @@ export function segmentIntentionClauses(rawQuery: string): IntentionSegment[] {
 
     let domain: DomainType = 'QUERY';
 
-    if (cNorm.includes('agua') || cNorm.includes('água') || cNorm.includes('500ml') || cNorm.includes('1l') || cNorm.includes('hidratacao')) {
+    if (
+      cNorm.includes('agua') || cNorm.includes('água') || cNorm.includes('hidratacao') || cNorm.includes('hidratação') ||
+      (/\bbeb(i|eu|endo|er)\b/.test(cNorm) && /\d/.test(cNorm))
+    ) {
       domain = 'WATER';
     } else if (/\b(comi|almocei|jantei|lanchei|whey|ovo|ovos|frango|arroz|refeicao|refeição|refeicoes|refeições|suplemento)\b/.test(cNorm)) {
       domain = 'MEALS';
@@ -275,7 +279,7 @@ export function segmentIntentionClauses(rawQuery: string): IntentionSegment[] {
       domain = 'EXAMS';
     } else if (/\b(consulta|consultas|agendei|marquei|marque|agendamento|dermatologista|pediatra|cardiologista|medico|médico|desmarque)\b/.test(cNorm)) {
       domain = 'AGENDA';
-    } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
+    } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei|tomar)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
       domain = 'MEDS';
     } else if (/\b(peso|altura|idade)\b/.test(cNorm) && (cNorm.includes('meu') || cNorm.includes('minha') || cNorm.includes('corrija') || cNorm.includes('kg') || cNorm.includes('cm'))) {
       domain = 'PROFILE';
@@ -685,23 +689,47 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
     const doseMatch = cNorm.match(/(\d+(?:\.\d+)?)\s*(mg|g|ml|ui|comprimido|comprimidos|dose)?/);
     const dosage = doseMatch ? `${doseMatch[1]} ${doseMatch[2] || 'mg'}` : '1 dose';
 
-    // Extract medication name
-    let medName = rawText.replace(/(?:tomei|tomando|registre|registrar|medicamento|remedio|remova|cancele)\s+/i, '').trim();
+    // Extract medication name — strip leading filler/verb phrases first (covers
+    // "comecei a tomar", "vou começar a tomar", "começando a tomar", etc, not
+    // just the bare "tomei"/"tomando" this used to handle)
+    let medName = rawText
+      .replace(/^(?:vou\s+)?come[cç](?:ei|ando|ar|ou|a)\s+a\s+tomar\s+/i, '')
+      .replace(/^(?:tomei|tomando|iniciei|registre|registrar|medicamento|remedio|remédio|remova|cancele)\s+/i, '')
+      .trim();
     // Remove dosage info from name
     medName = medName.replace(/\d+\s*(?:mg|g|ml|ui|comprimido|comprimidos|dose)s?\s*/gi, '').trim();
-    // Remove date info from name
-    medName = medName.replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g, '').replace(/dia\s+\d{1,2}\s+de\s+[a-zA-ZÀ-ÿ]+/gi, '').trim();
+    // Remove date info from name ("dia 15/08", "15/08", "dia 15 de agosto", "a partir de ...")
+    medName = medName
+      .replace(/a\s+partir\s+de\s*/gi, '')
+      .replace(/dia\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi, '')
+      .replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g, '')
+      .replace(/dia\s+\d{1,2}\s+de\s+[a-zA-ZÀ-ÿ]+/gi, '')
+      .trim();
+    // Remove time phrases ("às 6h", "as 18h30", "às 14:30")
+    medName = medName
+      .replace(/(?:as|às)\s+\d{1,2}(?::\d{2}|h\d{0,2}|\s*hrs?|\s*horas?)/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
     
     if (!medName || medName.length < 2) medName = 'Medicamento';
 
     // Extract start date if specified
     const dateTimeInfo = parseDateTimeFromText(rawText);
-    
-    // Check if there's a specific start date mentioned
+
+    // Check if there's a specific start date mentioned — either an explicit date
+    // ("dia 15/08", "15/08", "15 de agosto") or a "starting"/"began" verb stem
+    // (covers começou/começando/começava/comecei/começo, iniciei/iniciando/início)
+    const hasExplicitDate = /\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/.test(rawText) || /dia\s+\d{1,2}\s+de\s+[a-zA-ZÀ-ÿ]+/i.test(rawText);
     let startDateIso: string | undefined;
-    if (cNorm.includes('apartir') || cNorm.includes('a partir') || cNorm.includes('comecou') || cNorm.includes('começou') || cNorm.includes('iniciei')) {
+    if (hasExplicitDate || /\b(apartir|a partir|comec|inici)/.test(cNorm)) {
       startDateIso = dateTimeInfo.isoDate;
     }
+
+    // Only override the default time if the user actually spoke one — otherwise
+    // leave it undefined so the handler can fall back sensibly instead of using
+    // whatever moment the message happened to be sent.
+    const hasExplicitTime = /(?:as\s+|às\s+)?\d{1,2}(?::|h|\s*hrs?|\s*horas?)\d{0,2}/i.test(rawText);
+    const medTimeStr = hasExplicitTime ? dateTimeInfo.timeStr : undefined;
 
     return {
       domain: 'MEDS',
@@ -709,7 +737,8 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
       rawText,
       medName,
       dosage,
-      startDateIso
+      startDateIso,
+      medTimeStr
     };
   }
 
@@ -1016,7 +1045,7 @@ export function classifyAndExecuteQuery(
           type: 'Remédio',
           medicationName: plan.medName || 'Medicamento',
           dosage: plan.dosage || '1 dose',
-          times: [new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })],
+          times: [plan.medTimeStr || '10:00'],
           prescriptionDate: startDate,
           isActive: true,
           date: startDate
@@ -1024,7 +1053,8 @@ export function classifyAndExecuteQuery(
         isMutation = true;
         actionsTaken.push('addMedication');
         const displayDate = new Date(startDate).toLocaleDateString('pt-BR');
-        logMessages.push(`💊 **Medicamento:** ✔ Registrado "${plan.medName}" (${plan.dosage}) a partir de ${displayDate} na Base Central`);
+        const displayTime = plan.medTimeStr || '10:00';
+        logMessages.push(`💊 **Medicamento:** ✔ Registrado "${plan.medName}" (${plan.dosage}) às ${displayTime}, a partir de ${displayDate} na Base Central`);
       }
       continue;
     }
