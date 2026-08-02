@@ -319,6 +319,7 @@ export const profileTool: BrainTool = {
     goal: z.enum(['Muscle Gain', 'Weight Loss', 'Maintenance', 'Health']).optional(),
     foodRestrictions: z.string().optional(),
     sleepQuality: z.string().optional(),
+    language: z.enum(['pt-BR', 'en-US', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'ja-JP', 'zh-CN', 'ru-RU', 'ar-SA', 'hi-IN', 'ko-KR']).optional(),
     needsClarification: z.boolean().optional(),
     clarificationQuestion: z.string().optional()
   }),
@@ -413,6 +414,30 @@ export const notificationsTool: BrainTool = {
   }
 };
 
+// 11. SETTINGS TOOL
+export const settingsTool: BrainTool = {
+  name: 'settings_tool',
+  description: 'Altera preferências visuais do app: tema claro/escuro (setDarkMode). Para trocar o idioma da interface, use profile_tool com o campo "language" em vez desta ferramenta.',
+  schema: z.object({
+    action: z.enum(['setDarkMode']),
+    darkMode: z.boolean().optional(),
+    needsClarification: z.boolean().optional(),
+    clarificationQuestion: z.string().optional()
+  }),
+  execute: async (args): Promise<BrainToolResult> => {
+    if (args.action === 'setDarkMode' && typeof args.darkMode !== 'boolean') {
+      throw new Error('darkMode is required for setDarkMode');
+    }
+    return {
+      domain: 'SETTINGS',
+      action: args.action,
+      payload: extractPayload(args),
+      needsClarification: args.needsClarification ?? false,
+      clarificationQuestion: args.clarificationQuestion
+    };
+  }
+};
+
 export const allBrainTools: BrainTool[] = [
   waterTool,
   mealsTool,
@@ -423,5 +448,6 @@ export const allBrainTools: BrainTool[] = [
   profileTool,
   goalsTool,
   mentalHealthTool,
-  notificationsTool
+  notificationsTool,
+  settingsTool
 ];

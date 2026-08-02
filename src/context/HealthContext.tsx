@@ -62,6 +62,7 @@ interface HealthContextType {
   updateGoal: (id: string, goal: Partial<HealthGoal>) => void;
   setAvatar: (avatar: string | null) => void;
   toggleDarkMode: () => void;
+  setDarkMode: (value: boolean) => void;
   // Meal CRUD
   addMeal: (meal: Omit<Meal, 'id'>) => void;
   updateMeal: (id: string, meal: Partial<Meal>) => void;
@@ -2023,6 +2024,7 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       updateGoal,
       setAvatar,
       toggleDarkMode,
+      setDarkMode,
       addMeal,
       updateMeal,
       deleteMeal,

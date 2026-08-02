@@ -9,7 +9,8 @@ import {
   profileTool,
   goalsTool,
   mentalHealthTool,
-  notificationsTool
+  notificationsTool,
+  settingsTool
 } from './brainTools';
 import type { BrainTool } from './toolSchema';
 
@@ -149,5 +150,28 @@ describe('notifications_tool', () => {
 
   it('rejects an invalid notification type enum', async () => {
     await expect(runTool(notificationsTool, { action: 'addNotification', title: 'Teste', type: 'tipo_invalido' })).rejects.toThrow();
+  });
+});
+
+describe('settings_tool', () => {
+  it('accepts a valid setDarkMode payload', async () => {
+    const result = await runTool(settingsTool, { action: 'setDarkMode', darkMode: true });
+    expect(result.domain).toBe('SETTINGS');
+    expect(result.payload.darkMode).toBe(true);
+  });
+
+  it('rejects setDarkMode without a boolean value', async () => {
+    await expect(runTool(settingsTool, { action: 'setDarkMode' })).rejects.toThrow();
+  });
+});
+
+describe('profile_tool language field', () => {
+  it('accepts a valid language change', async () => {
+    const result = await runTool(profileTool, { action: 'updateProfile', language: 'en-US' });
+    expect(result.payload.language).toBe('en-US');
+  });
+
+  it('rejects an unknown language code', async () => {
+    await expect(runTool(profileTool, { action: 'updateProfile', language: 'xx-XX' })).rejects.toThrow();
   });
 });

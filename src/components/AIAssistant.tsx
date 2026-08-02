@@ -43,6 +43,7 @@ export default function AIAssistant() {
     updateMeal,
     deleteMeal,
     toggleDarkMode,
+    setDarkMode,
     darkMode,
     addGymLog,
     deleteGymLog,
@@ -578,6 +579,11 @@ export default function AIAssistant() {
               time: payload.time || 'Agora'
             });
             appliedLogs.push(`• **Notificação:** Lembrete "${payload.title}" criado`);
+          }
+        } else if (domain === 'SETTINGS') {
+          if (action === 'setDarkMode' && typeof payload.darkMode === 'boolean') {
+            setDarkMode(payload.darkMode);
+            appliedLogs.push(`• **Configurações:** Tema ${payload.darkMode ? 'escuro' : 'claro'} ativado`);
           }
         }
       }
