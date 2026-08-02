@@ -262,7 +262,7 @@ DIRETRIZES DE USO DAS TOOLS:
    - Refeições: se o usuário descrever um alimento/prato sem valores exatos ("comi um sanduíche de atum", "2 ovos mexidos"), estime calorias, proteína, carboidratos e gordura usando seu conhecimento nutricional e porções padrão, e preencha esses campos na mealsTool. Só deixe em branco se for genuinamente impossível estimar.
    - Unidades: converta tudo para a unidade que a tool espera (litros/copos -> ml; libras -> kg; etc.), nunca passe a unidade errada adiante.
    - Medicamentos (Continuous Medication): normalize nome (sem verbos/data/hora dentro do nome) e dosagem antes de chamar medical_history_tool. SEMPRE inclua o campo "times" com pelo menos um horário — se o usuário não disser a hora exata ("essa hora mesmo", sem especificar), use um horário padrão razoável (ex: "08:00") em vez de omitir o campo. Sem "times" o medicamento não aparece na agenda do usuário. Se o usuário mencionar até quando vai tomar ("até dia 30/09", "por 10 dias", "só essa semana"), resolva isso para uma data absoluta e preencha "validityDate" — sem esse campo o medicamento é tratado como uso contínuo (sem data final) e continua aparecendo na agenda indefinidamente.
-   - Datas: "hoje"/"ontem"/"amanhã"/"dia X" — resolva sempre para uma data absoluta (YYYY-MM-DD) antes de enviar; nunca repasse texto relativo cru.
+   - Datas: "hoje"/"ontem"/"amanhã"/"dia X" — resolva sempre para uma data absoluta (YYYY-MM-DD) antes de enviar; nunca repasse texto relativo cru. Repetindo a REGRA DE OURO bem aqui, no ponto onde você monta o campo de data: o ano é ${todayIso.slice(0, 4)} a menos que o usuário diga um ano diferente — isso vale mesmo se outras partes do pedido (nome do remédio, dosagem) estiverem faltando e você for usar needsClarification; a incerteza sobre esses outros campos não deve te fazer hesitar ou errar o ano.
 6. Se o pedido tiver informação insuficiente para uma ação seguramente correta (ex: falta identificar qual registro remover entre vários parecidos), use needsClarification=true e clarificationQuestion em vez de adivinhar.`;
 
     let result: ProviderResult | null = null;
@@ -295,6 +295,7 @@ DIRETRIZES DE USO DAS TOOLS:
 
     const toolMap = new Map(allBrainTools.map(t => [t.name, t]));
     const operations: any[] = [];
+    let failedToolCalls = 0;
     for (const call of result.toolCalls) {
       const tool = toolMap.get(call.name);
       if (!tool) continue;
@@ -302,13 +303,21 @@ DIRETRIZES DE USO DAS TOOLS:
         const parsedArgs = tool.schema.parse(call.args);
         operations.push(await tool.execute(parsedArgs));
       } catch (err: any) {
+        // The AI tried to act but sent an invalid/incomplete payload (e.g. a
+        // required field missing). Silently dropping this used to leave the
+        // user with an empty "Processado" reply that looked like success —
+        // now it always surfaces as a request to clarify instead.
         console.error(`Error running tool ${call.name}:`, err);
+        failedToolCalls++;
       }
     }
 
-    const reply = result.text || (operations.length > 0
+    const baseReply = result.text || (operations.length > 0
       ? `Operações identificadas pelo Cérebro OMNI: ${operations.length} ação(ões).`
-      : "Processado pelo Cérebro OMNI.");
+      : (failedToolCalls > 0 ? "" : "Processado pelo Cérebro OMNI."));
+    const reply = failedToolCalls > 0
+      ? [baseReply, "Não consegui registrar parte do seu pedido porque faltou alguma informação — pode detalhar melhor (nome, valor, data...)?"].filter(Boolean).join("\n\n")
+      : baseReply;
 
     return res.json({
       operations,

@@ -55,6 +55,16 @@ describe('gym_tool', () => {
   it('rejects sets that is not an array', async () => {
     await expect(runTool(gymTool, { action: 'addGymLog', sets: 'cinco' })).rejects.toThrow();
   });
+
+  it('normalizes "daily" to the literal "Every day" the app checks for', async () => {
+    const result = await runTool(gymTool, { action: 'addRoutine', name: 'Corrida', repeat: 'daily' });
+    expect(result.payload.repeat).toBe('Every day');
+  });
+
+  it('normalizes "weekdays" to the literal "Monday-Friday" the app checks for', async () => {
+    const result = await runTool(gymTool, { action: 'addRoutine', name: 'Academia', repeat: 'weekdays' });
+    expect(result.payload.repeat).toBe('Monday-Friday');
+  });
 });
 
 describe('medical_history_tool', () => {

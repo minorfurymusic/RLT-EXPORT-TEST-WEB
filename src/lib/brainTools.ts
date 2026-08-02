@@ -122,6 +122,19 @@ export const gymTool: BrainTool = {
     if (args.action === 'deleteRoutine' && !args.id) {
       throw new Error('id is required for deleteRoutine');
     }
+    // The app's routine screens compare `repeat` against the exact literal
+    // strings "Every day" / "Monday-Friday" — the AI naturally writes
+    // "daily", "todo dia", "weekdays" etc, which would silently create a
+    // routine the UI never recognizes as recurring. Normalize common
+    // synonyms to the literal the rest of the app actually checks for.
+    if (typeof args.repeat === 'string') {
+      const normalizedRepeat = args.repeat.trim().toLowerCase();
+      if (['daily', 'every day', 'everyday', 'todo dia', 'todos os dias'].includes(normalizedRepeat)) {
+        args.repeat = 'Every day';
+      } else if (['weekdays', 'monday-friday', 'segunda a sexta', 'seg a sex', 'dias uteis', 'dias úteis'].includes(normalizedRepeat)) {
+        args.repeat = 'Monday-Friday';
+      }
+    }
     return {
       domain: 'GYM',
       action: args.action,
