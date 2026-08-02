@@ -87,7 +87,7 @@ export const gymTool: BrainTool = {
   name: 'gym_tool',
   description: 'Gerencia treinos, exercícios e rotinas de exercícios (addGymLog, addRoutine, updateRoutine)',
   schema: z.object({
-    action: z.enum(['addGymLog', 'addRoutine', 'updateRoutine']),
+    action: z.enum(['addGymLog', 'deleteGymLog', 'addRoutine', 'updateRoutine', 'deleteRoutine']),
     id: z.string().optional(),
     exerciseName: z.string().optional(),
     muscleGroup: z.string().optional(),
@@ -110,11 +110,17 @@ export const gymTool: BrainTool = {
     if (args.action === 'addGymLog' && !args.exerciseName) {
       throw new Error('exerciseName is required for addGymLog');
     }
+    if (args.action === 'deleteGymLog' && !args.id) {
+      throw new Error('id is required for deleteGymLog');
+    }
     if (args.action === 'addRoutine' && !args.name) {
       throw new Error('name is required for addRoutine');
     }
     if (args.action === 'updateRoutine' && !args.id) {
       throw new Error('id is required for updateRoutine');
+    }
+    if (args.action === 'deleteRoutine' && !args.id) {
+      throw new Error('id is required for deleteRoutine');
     }
     return {
       domain: 'GYM',

@@ -46,6 +46,9 @@ export default function AIAssistant() {
     darkMode,
     addGymLog,
     deleteGymLog,
+    addRoutine,
+    updateRoutine,
+    deleteRoutine,
     generateDailyPerformanceSnapshot,
     waterLogs,
     meals,
@@ -483,6 +486,24 @@ export default function AIAssistant() {
           } else if (action === 'deleteGymLog' && payload.id) {
             deleteGymLog(payload.id);
             appliedLogs.push(`• **Treino:** Registro de treino removido (${payload.id})`);
+          } else if (action === 'addRoutine') {
+            const routineData = {
+              name: payload.name || 'Rotina',
+              time: payload.time || '08:00',
+              completed: Boolean(payload.completed),
+              type: payload.routineType || 'other',
+              repeat: payload.repeat || 'Every day',
+              stepGoal: payload.stepGoal
+            };
+            addRoutine(routineData);
+            appliedLogs.push(`• **Treino:** Rotina "${routineData.name}" criada`);
+          } else if (action === 'updateRoutine' && payload.id) {
+            const { routineType, ...rest } = payload;
+            updateRoutine(payload.id, routineType ? { ...rest, type: routineType } : rest);
+            appliedLogs.push(`• **Treino:** Rotina atualizada (${payload.id})`);
+          } else if (action === 'deleteRoutine' && payload.id) {
+            deleteRoutine(payload.id);
+            appliedLogs.push(`• **Treino:** Rotina removida (${payload.id})`);
           }
         } else if (domain === 'MEDICAL_HISTORY') {
           if (action === 'addHistoryRecord') {
