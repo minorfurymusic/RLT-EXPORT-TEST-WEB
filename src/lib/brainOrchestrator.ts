@@ -216,6 +216,11 @@ export function parseDateTimeFromText(text: string): { isoDate: string; timeStr:
       const yStr = numDateMatch[3];
       targetYear = yStr.length === 2 ? 2000 + parseInt(yStr, 10) : parseInt(yStr, 10);
     }
+  } else if (/\bdia\s+(\d{1,2})\b/.test(norm)) {
+    // Bare day reference with no month ("dia 10") — assume the current month/year,
+    // same grounding rule used for the AI path, instead of silently defaulting to today.
+    const bareDayMatch = norm.match(/\bdia\s+(\d{1,2})\b/)!;
+    targetDay = parseInt(bareDayMatch[1], 10);
   } else if (norm.includes('ontem')) {
     const d = new Date();
     d.setDate(d.getDate() - 1);
@@ -704,10 +709,12 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
       .replace(/dia\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi, '')
       .replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g, '')
       .replace(/dia\s+\d{1,2}\s+de\s+[a-zA-ZÀ-ÿ]+/gi, '')
+      .replace(/\bdia\s+\d{1,2}\b/gi, '') // bare day reference with no month ("dia 10")
       .trim();
     // Remove time phrases ("às 6h", "as 18h30", "às 14:30")
     medName = medName
       .replace(/(?:as|às)\s+\d{1,2}(?::\d{2}|h\d{0,2}|\s*hrs?|\s*horas?)/gi, '')
+      .replace(/sem\s+(?:hor[aá]rio|hora)\s*(?:marcad[oa]\s*)?(?:ainda|definid[oa])?\b/gi, '') // "sem hora marcada ainda"
       .replace(/\s{2,}/g, ' ')
       .trim();
     
