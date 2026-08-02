@@ -28,7 +28,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useHealth } from '../context/HealthContext';
 import { cn } from '../lib/utils';
-import { Type } from "@google/genai";
 import { safeJsonParse, getGoogleGenAI } from '../lib/ai';
 import { MentalHealthResponse } from '../types';
 import { anonymizeProfile } from '../lib/lgpd';
@@ -506,8 +505,6 @@ const MentalWellBeing = ({ onBack }: { onBack: () => void }) => {
   const generateQuestions = async () => {
     setLoading(true);
     try {
-      const model = "gemini-3.6-flash";
-      
       // LGPD: Anonymize profile
       const anonProfile = anonymizeProfile(profile);
       
@@ -534,32 +531,9 @@ const MentalWellBeing = ({ onBack }: { onBack: () => void }) => {
 
       const genAI = getGoogleGenAI();
       const response = await genAI.models.generateContent({
-        model,
         contents: prompt,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                text: { type: Type.STRING },
-                options: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      label: { type: Type.STRING },
-                      value: { type: Type.NUMBER }
-                    },
-                    required: ["label", "value"]
-                  }
-                }
-              },
-              required: ["id", "text", "options"]
-            }
-          }
+          responseMimeType: "application/json"
         }
       });
 
@@ -601,7 +575,6 @@ const MentalWellBeing = ({ onBack }: { onBack: () => void }) => {
     addMentalHealthResponse(mentalResponse);
 
     try {
-      const model = "gemini-3.6-flash";
       const prompt = `Based on these mental health quiz results (Score: ${finalScore}/100) and answers: ${JSON.stringify(mentalResponse.answers)}, provide a short, supportive, and actionable insight (max 3 sentences).
       
       INSTRUÇÕES DE IDIOMA (OMNI-V50):
@@ -610,7 +583,6 @@ const MentalWellBeing = ({ onBack }: { onBack: () => void }) => {
       
       const genAI = getGoogleGenAI();
       const response = await genAI.models.generateContent({
-        model,
         contents: prompt
       });
       setAiInsight(response.text);
