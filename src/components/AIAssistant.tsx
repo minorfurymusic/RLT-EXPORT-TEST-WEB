@@ -420,10 +420,19 @@ export default function AIAssistant() {
 
       // 3. Execute real HealthContext functions for each operation
       const appliedLogs: string[] = [];
+      const clarificationQuestions: string[] = [];
 
       for (const op of operations) {
         const { domain, action, payload } = op;
         if (!payload) continue;
+
+        // The AI flags parts of the message it wasn't confident enough about instead
+        // of guessing. Skip applying just that operation and ask the user back —
+        // everything else in the same message that WAS understood still gets applied.
+        if (op.needsClarification) {
+          if (op.clarificationQuestion) clarificationQuestions.push(op.clarificationQuestion);
+          continue;
+        }
 
         if (domain === 'WATER') {
           if (action === 'addWaterLog') {
@@ -552,14 +561,22 @@ export default function AIAssistant() {
         }
       }
 
-      // 4. Construct final response citing real recorded values
+      // 4. Construct final response citing real recorded values — and, for any
+      // part of the message the AI wasn't sure about, ask instead of having
+      // silently guessed. The two are independent: what was understood gets
+      // recorded either way, the question is just about what wasn't.
       let aiContent = "";
       if (appliedLogs.length > 0) {
         aiContent = `🤖 **Cérebro OMNI — Operações Executadas na Base Central:**\n\n` +
           appliedLogs.join('\n') +
           `\n\n*Valores reais gravados e confirmados no seu HealthContext.*`;
-      } else {
+      } else if (clarificationQuestions.length === 0) {
         aiContent = brainReply || t('ai.error');
+      }
+      if (clarificationQuestions.length > 0) {
+        const questionsBlock = `❓ **Preciso confirmar antes de continuar:**\n\n` +
+          clarificationQuestions.map(q => `• ${q}`).join('\n');
+        aiContent = aiContent ? `${aiContent}\n\n${questionsBlock}` : questionsBlock;
       }
 
       const finalMessages: ChatMessage[] = [
