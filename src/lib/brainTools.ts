@@ -204,6 +204,7 @@ export const medicalHistoryTool: BrainTool = {
     times: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
     prescriptionDate: z.string().optional(),
+    validityDate: z.string().optional(),
     subtype: z.enum(['Blood Pressure', 'Glucose', 'Other']).optional(),
     bloodPressure: z.object({ systolic: z.number(), diastolic: z.number(), pulse: z.number() }).optional(),
     glucose: z.object({ value: z.number(), state: z.enum(['Jejum', 'Pré-prandial', 'Pós-prandial']) }).optional(),
