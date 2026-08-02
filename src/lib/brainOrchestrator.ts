@@ -177,6 +177,32 @@ const MONTH_MAP: Record<string, number> = {
   dezembro: 11, dez: 11
 };
 
+// Portuguese number words for 1-31 (day) / 1-12 (month) spelled out, e.g. "sete do doze".
+// Bounded to known number words on purpose — never matched against arbitrary "X de Y" text.
+const NUMBER_WORD_UNITS: Record<string, number> = {
+  um: 1, dois: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9
+};
+const NUMBER_WORD_TEENS: Record<string, number> = {
+  dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15,
+  dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19
+};
+const NUMBER_WORD_TENS: Record<string, number> = { vinte: 20, trinta: 30 };
+const NUMBER_WORD_ALL = { ...NUMBER_WORD_UNITS, ...NUMBER_WORD_TEENS, ...NUMBER_WORD_TENS };
+const NUMBER_WORD_ALT = Object.keys(NUMBER_WORD_ALL).sort((a, b) => b.length - a.length).join('|');
+
+// Matches one spelled-out number 1-31, e.g. "sete", "dezenove", "vinte", "vinte e sete".
+const NUMBER_WORD_PHRASE = `(?:${NUMBER_WORD_ALT})(?:\\s+e\\s+(?:${Object.keys(NUMBER_WORD_UNITS).join('|')}))?`;
+
+function parseSpelledNumber(phrase: string): number | null {
+  const parts = phrase.trim().split(/\s+e\s+/);
+  const base = NUMBER_WORD_ALL[parts[0]];
+  if (base === undefined) return null;
+  if (parts.length === 1) return base;
+  const unit = NUMBER_WORD_UNITS[parts[1]];
+  if (unit === undefined || !(parts[0] in NUMBER_WORD_TENS)) return null;
+  return base + unit;
+}
+
 /**
  * FASE 2 & FASE 3 Helper: Parse dates and times with precision from Portuguese text
  */
@@ -202,6 +228,18 @@ export function parseDateTimeFromText(text: string): { isoDate: string; timeStr:
   // Numerical Date extraction: "30/09", "03/07", "15/08/2026"
   const numDateMatch = text.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
 
+  // Dash-separated numeric date: "7-12", "07-12-2026"
+  const dashDateMatch = text.match(/\b(\d{1,2})-(\d{1,2})(?:-(\d{2,4}))?\b/);
+
+  // "N do M" — numeric day/month with "do" instead of "de" (writtenMonthMatch only
+  // accepts a month *name*, so this never overlaps with it)
+  const numDoMatch = norm.match(/\b(\d{1,2})\s+do\s+(\d{1,2})\b/);
+
+  // Fully spelled-out day/month: "sete do doze", "vinte e cinco de dez" (mixed also matches
+  // via writtenMonthMatch already for the month side; this covers a spelled-out month too)
+  const spelledDateRegex = new RegExp(`\\b(${NUMBER_WORD_PHRASE})\\s+(?:de|do)\\s+(${NUMBER_WORD_PHRASE})\\b`);
+  const spelledDateMatch = norm.match(spelledDateRegex);
+
   if (writtenMonthMatch && MONTH_MAP[writtenMonthMatch[2]] !== undefined) {
     targetDay = parseInt(writtenMonthMatch[1], 10);
     targetMonth = MONTH_MAP[writtenMonthMatch[2]];
@@ -216,6 +254,19 @@ export function parseDateTimeFromText(text: string): { isoDate: string; timeStr:
       const yStr = numDateMatch[3];
       targetYear = yStr.length === 2 ? 2000 + parseInt(yStr, 10) : parseInt(yStr, 10);
     }
+  } else if (dashDateMatch && parseInt(dashDateMatch[1], 10) <= 31 && parseInt(dashDateMatch[2], 10) <= 12) {
+    targetDay = parseInt(dashDateMatch[1], 10);
+    targetMonth = parseInt(dashDateMatch[2], 10) - 1;
+    if (dashDateMatch[3]) {
+      const yStr = dashDateMatch[3];
+      targetYear = yStr.length === 2 ? 2000 + parseInt(yStr, 10) : parseInt(yStr, 10);
+    }
+  } else if (numDoMatch && parseInt(numDoMatch[2], 10) <= 12) {
+    targetDay = parseInt(numDoMatch[1], 10);
+    targetMonth = parseInt(numDoMatch[2], 10) - 1;
+  } else if (spelledDateMatch && parseSpelledNumber(spelledDateMatch[2]) !== null && parseSpelledNumber(spelledDateMatch[2])! <= 12) {
+    targetDay = parseSpelledNumber(spelledDateMatch[1])!;
+    targetMonth = parseSpelledNumber(spelledDateMatch[2])! - 1;
   } else if (/\bdia\s+(\d{1,2})\b/.test(norm)) {
     // Bare day reference with no month ("dia 10") — assume the current month/year,
     // same grounding rule used for the AI path, instead of silently defaulting to today.
