@@ -139,6 +139,7 @@ export interface DomainParsedPlan {
   // Profile
   weightProfile?: number;
   heightProfile?: number;
+  ageProfile?: number;
   goalProfile?: string;
 }
 
@@ -327,19 +328,21 @@ export function segmentIntentionClauses(rawQuery: string): IntentionSegment[] {
       (/\bbeb(i|eu|endo|er)\b/.test(cNorm) && /\d/.test(cNorm))
     ) {
       domain = 'WATER';
-    } else if (/\b(comi|almocei|jantei|lanchei|whey|ovo|ovos|frango|arroz|refeicao|refeição|refeicoes|refeições|suplemento)\b/.test(cNorm)) {
+    } else if (/\b(comi|almocei|jantei|lanchei|lanche|whey|ovo|ovos|frango|arroz|refeicao|refeição|refeicoes|refeições|suplemento)\b/.test(cNorm)) {
       domain = 'MEALS';
-    } else if (/\b(supino|agachamento|dumbbell|treinei|treino|exercicio|exercício|caminhada|corri|caminhei|corrida|peito|costas|perna|pernas|biceps|triceps|ombro|ombros)\b/.test(cNorm)) {
+    } else if (/\b(supino|agachamento|dumbbell|treinei|treino|academia|exercicio|exercício|flexao|flexoes|flexões|caminhada|corri|caminhei|corrida|pedalei|pedal|peito|costas|perna|pernas|biceps|triceps|ombro|ombros)\b/.test(cNorm)) {
       domain = 'GYM';
-    } else if (/\b(exame|exames|testosterona|hemograma|glicemia|vitamina d|colesterol|ultrassom|ressonancia|raio x|laboratorio)\b/.test(cNorm)) {
+    } else if (/\b(exame|exames|testosterona|hemograma|glicemia|vitamina d|colesterol|ultrassom|ressonancia|raio[\s-]?x|laboratorio)\b/.test(cNorm)) {
       domain = 'EXAMS';
     } else if (/\b(consulta|consultas|agendei|marquei|marque|agendamento|dermatologista|pediatra|cardiologista|medico|médico|desmarque)\b/.test(cNorm)) {
       domain = 'AGENDA';
-    } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei|tomar)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
+    } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei|tomo|tomar)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
       domain = 'MEDS';
-    } else if (/\b(peso|altura|idade)\b/.test(cNorm) && (cNorm.includes('meu') || cNorm.includes('minha') || cNorm.includes('corrija') || cNorm.includes('kg') || cNorm.includes('cm'))) {
+    } else if ((/\b(peso|altura|idade|anos)\b/.test(cNorm) && (cNorm.includes('meu') || cNorm.includes('minha') || cNorm.includes('corrija') || cNorm.includes('corrige') || cNorm.includes('tenho') || cNorm.includes('kg') || cNorm.includes('cm')))) {
       domain = 'PROFILE';
-    } else if (cNorm.includes('trocar tema') || cNorm.includes('mudar tema') || cNorm.includes('modo escuro') || cNorm.includes('modo claro')) {
+    } else if (/\btema\b/.test(cNorm) && /\b(troc|mud|altern)/.test(cNorm)) {
+      domain = 'THEME';
+    } else if (cNorm.includes('modo escuro') || cNorm.includes('modo claro')) {
       domain = 'THEME';
     }
 
@@ -803,6 +806,8 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
   if (domain === 'PROFILE') {
     const weightMatch = cNorm.match(/(\d+(?:\.\d+)?)\s*kg/);
     const heightMatch = cNorm.match(/(\d+)\s*cm/);
+    // "corrige minha idade pra 33", "tenho 32 anos" — either wording for age
+    const ageMatch = cNorm.match(/(?:idade\D{0,10}|tenho\s+)(\d{1,3})\s*(?:anos)?\b/) || cNorm.match(/(\d{1,3})\s*anos\b/);
 
     // Extract goal change
     let goalProfile: string | undefined;
@@ -838,6 +843,7 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
       rawText,
       weightProfile: weightMatch ? parseFloat(weightMatch[1]) : undefined,
       heightProfile: heightMatch ? parseInt(heightMatch[1], 10) : undefined,
+      ageProfile: ageMatch ? parseInt(ageMatch[1], 10) : undefined,
       goalProfile
     };
   }
@@ -1132,6 +1138,12 @@ export function classifyAndExecuteQuery(
         isMutation = true;
         actionsTaken.push('updateProfileHeight');
         logMessages.push(`📏 **Perfil:** ✔ Altura atualizada para **${plan.heightProfile} cm** na Base Central`);
+      }
+      if (plan.ageProfile) {
+        ctx.updateProfile({ age: plan.ageProfile });
+        isMutation = true;
+        actionsTaken.push('updateProfileAge');
+        logMessages.push(`🎂 **Perfil:** ✔ Idade atualizada para **${plan.ageProfile} anos** na Base Central`);
       }
       if (plan.goalProfile) {
         ctx.updateProfile({ goal: plan.goalProfile as any });
