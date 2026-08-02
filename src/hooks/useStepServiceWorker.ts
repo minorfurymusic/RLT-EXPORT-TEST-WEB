@@ -193,8 +193,8 @@ export function useStepServiceWorker(options: UseStepServiceWorkerOptions = {}) 
     try {
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification(title, {
-        icon: '/icons/icon-192.png',
-        badge: '/icons/badge-72.png',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         ...({ vibrate: [200, 100, 200] } as NotificationOptions),
         ...options,
       });

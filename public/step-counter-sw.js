@@ -252,8 +252,8 @@ async function syncSteps() {
         if (data.steps >= data.dailyGoal) {
           await self.registration.showNotification('🎉 Meta de Passos Atingida!', {
             body: `Você deu ${data.steps.toLocaleString()} passos hoje!`,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/badge-72.png',
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
             tag: 'step-goal',
             requireInteraction: false,
             vibrate: [200, 100, 200]
@@ -274,8 +274,8 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body || 'Lembrete de passos!',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/badge-72.png',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/'
