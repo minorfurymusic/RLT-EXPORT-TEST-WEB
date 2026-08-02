@@ -1946,7 +1946,7 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       while (current <= endDate) {
         const dateStr = current.toISOString().split('T')[0];
         
-        med.times.forEach(time => {
+        (med.times && med.times.length > 0 ? med.times : ['08:00']).forEach(time => {
           const id = `med-${med.id}-${dateStr}-${time}`;
           const log = adherenceLogs.find(l => l.medicationId === med.id && l.date === dateStr && l.time === time);
           

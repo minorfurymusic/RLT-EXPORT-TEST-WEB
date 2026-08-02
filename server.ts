@@ -259,7 +259,7 @@ DIRETRIZES DE USO DAS TOOLS:
 5. FAÇA VOCÊ MESMO todo cálculo e normalização — nunca deixe um campo numérico em branco esperando que o app calcule depois:
    - Refeições: se o usuário descrever um alimento/prato sem valores exatos ("comi um sanduíche de atum", "2 ovos mexidos"), estime calorias, proteína, carboidratos e gordura usando seu conhecimento nutricional e porções padrão, e preencha esses campos na mealsTool. Só deixe em branco se for genuinamente impossível estimar.
    - Unidades: converta tudo para a unidade que a tool espera (litros/copos -> ml; libras -> kg; etc.), nunca passe a unidade errada adiante.
-   - Medicamentos: normalize nome (sem verbos/data/hora dentro do nome), dosagem e horário faltante (padrão razoável se não informado) antes de chamar medical_history_tool.
+   - Medicamentos (Continuous Medication): normalize nome (sem verbos/data/hora dentro do nome) e dosagem antes de chamar medical_history_tool. SEMPRE inclua o campo "times" com pelo menos um horário — se o usuário não disser a hora exata ("essa hora mesmo", sem especificar), use um horário padrão razoável (ex: "08:00") em vez de omitir o campo. Sem "times" o medicamento não aparece na agenda do usuário.
    - Datas: "hoje"/"ontem"/"amanhã"/"dia X" — resolva sempre para uma data absoluta (YYYY-MM-DD) antes de enviar; nunca repasse texto relativo cru.
 6. Se o pedido tiver informação insuficiente para uma ação seguramente correta (ex: falta identificar qual registro remover entre vários parecidos), use needsClarification=true e clarificationQuestion em vez de adivinhar.`;
 

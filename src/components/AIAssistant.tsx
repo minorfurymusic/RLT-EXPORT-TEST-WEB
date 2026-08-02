@@ -477,7 +477,13 @@ export default function AIAssistant() {
           }
         } else if (domain === 'MEDICAL_HISTORY') {
           if (action === 'addHistoryRecord') {
-            await addHistoryRecord(payload);
+            // Continuous Medication needs `times` to show up on the agenda at all
+            // (medicationEvents iterates it) — the AI doesn't always include it
+            // when the user's message didn't give a clear time.
+            const historyPayload = payload.category === 'Continuous Medication'
+              ? { ...payload, times: Array.isArray(payload.times) && payload.times.length > 0 ? payload.times : ['08:00'] }
+              : payload;
+            await addHistoryRecord(historyPayload);
             appliedLogs.push(`• **Histórico Médico:** Registro "${payload.examName || payload.conditionName || payload.title || payload.category}" adicionado`);
           } else if (action === 'updateHistoryRecord' && payload.id) {
             await updateHistoryRecord(payload.id, payload);
