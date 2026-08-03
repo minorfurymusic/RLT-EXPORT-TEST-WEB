@@ -71,6 +71,15 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
       console.warn('Sensor permission notice:', e);
     }
 
+    // 1b. Health Connect (Opção B) — optional, only asked on native Android and
+    // only if Health Connect is installed; silently skipped otherwise so this
+    // never blocks the rest of the permissions flow.
+    try {
+      await withTimeout(sensorService.requestHealthConnectPermission(), false, 3000);
+    } catch (e) {
+      console.warn('Health Connect permission notice:', e);
+    }
+
     // 2. Notification API
     try {
       if ('Notification' in window) {

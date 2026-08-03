@@ -33,11 +33,34 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Opção A: contador de passos em segundo plano (StepCounterService.kt) -->
+        <service
+            android:name=".StepCounterService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
+
+    <!-- Opção B: visibilidade do pacote do Health Connect, necessária a partir do
+         Android 11 pra checar se ele está instalado (StepTrackerPlugin.kt) -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Health Connect (Opção B) — leitura de passos agregados de outros apps -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
 
     <!-- Contador de passos e monitoramento de saúde (src/services/sensorService.ts) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />

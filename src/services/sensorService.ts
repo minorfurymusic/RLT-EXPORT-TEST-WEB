@@ -4,6 +4,7 @@ import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { safeLocalStorage } from '../lib/utils';
+import { StepTracker } from './nativeStepBridge';
 
 export interface StepSensorData {
   steps: number;
@@ -66,7 +67,7 @@ class SensorService {
     this.checkAndResetDaily();
     const storedSteps = parseInt(safeLocalStorage.getItem('sensor_steps') || '0', 10);
     const lastBgTime = parseInt(safeLocalStorage.getItem('sensor_last_bg_time') || '0', 10);
-    
+
     // Solução 11: Smart hardware sync & step catch-up engine
     if (storedSteps > this.steps) {
       this.steps = storedSteps;
@@ -75,6 +76,64 @@ class SensorService {
     // If app was closed/backgrounded, sync latest step state to listeners
     if (this.onStepCallback) {
       this.onStepCallback(this.steps);
+    }
+
+    // Fire-and-forget: pull whatever the native side counted while this JS
+    // context wasn't running at all (app killed, not just backgrounded) —
+    // the JS-side accelerometer listener above can't see that gap, only the
+    // native foreground service (Opção A) and Health Connect (Opção B) can.
+    void this.syncFromNativeSources();
+  }
+
+  /**
+   * Reconciles the JS-tracked step count against the two native Android
+   * sources. Both are best-effort and independent: if Health Connect isn't
+   * installed/authorized, its call simply fails and is ignored; if the
+   * native foreground service hasn't produced a sensor event yet today, it
+   * just returns 0. Whichever source reports the highest count for today
+   * wins — "se um não funcionar, puxa o outro" — since undercounting from a
+   * quiet/unavailable source is far more likely than any source overcounting.
+   */
+  public async syncFromNativeSources(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let best = this.steps;
+
+    try {
+      const { steps } = await StepTracker.getSteps();
+      if (steps > best) best = steps;
+    } catch (e) {
+      console.warn('Native step service unavailable:', e);
+    }
+
+    try {
+      const { available } = await StepTracker.isHealthConnectAvailable();
+      if (available) {
+        const { steps } = await StepTracker.getHealthConnectSteps();
+        if (steps > best) best = steps;
+      }
+    } catch (e) {
+      // Expected when Health Connect isn't installed or permission wasn't granted yet.
+      console.warn('Health Connect steps unavailable:', e);
+    }
+
+    if (best > this.steps) {
+      this.setSteps(best);
+    }
+  }
+
+  /** Prompts the user for Health Connect read access (Opção B) — safe to call repeatedly. */
+  public async requestHealthConnectPermission(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) return false;
+    try {
+      const { available } = await StepTracker.isHealthConnectAvailable();
+      if (!available) return false;
+      const { granted } = await StepTracker.requestHealthConnectPermission();
+      if (granted) void this.syncFromNativeSources();
+      return granted;
+    } catch (e) {
+      console.warn('Health Connect permission request failed:', e);
+      return false;
     }
   }
 
@@ -172,6 +231,11 @@ class SensorService {
     this.enableBackgroundKeepAlive();
 
     if (Capacitor.isNativePlatform()) {
+      // Belt-and-suspenders with MainActivity's own StepCounterService.start()
+      // call — starting an already-running foreground service is a no-op.
+      StepTracker.startTracking().catch(e => console.warn('StepTracker.startTracking failed:', e));
+      void this.syncFromNativeSources();
+
       try {
         this.motionListenerHandle = await Motion.addListener('accel', (event) => {
           this.processAcceleration(event.acceleration, event.accelerationIncludingGravity);
