@@ -141,6 +141,7 @@ export interface DomainParsedPlan {
   heightProfile?: number;
   ageProfile?: number;
   goalProfile?: string;
+  stepGoalProfile?: number;
 }
 
 function normalizeText(text: string): string {
@@ -162,6 +163,17 @@ function capitalizeFirstLetter(text: string): string {
   if (idx === -1) return text;
   return text.slice(0, idx) + text.charAt(idx).toUpperCase() + text.slice(idx + 1);
 }
+
+const WEEKDAY_MAP: Record<string, number> = {
+  domingo: 0,
+  segunda: 1, 'segunda-feira': 1,
+  terca: 2, 'terca-feira': 2,
+  quarta: 3, 'quarta-feira': 3,
+  quinta: 4, 'quinta-feira': 4,
+  sexta: 5, 'sexta-feira': 5,
+  sabado: 6
+};
+const WEEKDAY_ALT = Object.keys(WEEKDAY_MAP).sort((a, b) => b.length - a.length).join('|');
 
 const MONTH_MAP: Record<string, number> = {
   janeiro: 0, jan: 0,
@@ -241,6 +253,10 @@ export function parseDateTimeFromText(text: string): { isoDate: string; timeStr:
   const spelledDateRegex = new RegExp(`\\b(${NUMBER_WORD_PHRASE})\\s+(?:de|do)\\s+(${NUMBER_WORD_PHRASE})\\b`);
   const spelledDateMatch = norm.match(spelledDateRegex);
 
+  // Weekday name: "sexta", "sexta-feira", "sexta que vem", "próxima segunda".
+  const weekdayRegex = new RegExp(`\\b(${WEEKDAY_ALT})\\b`);
+  const weekdayMatch = norm.match(weekdayRegex);
+
   if (writtenMonthMatch && MONTH_MAP[writtenMonthMatch[2]] !== undefined) {
     targetDay = parseInt(writtenMonthMatch[1], 10);
     targetMonth = MONTH_MAP[writtenMonthMatch[2]];
@@ -273,6 +289,17 @@ export function parseDateTimeFromText(text: string): { isoDate: string; timeStr:
     // same grounding rule used for the AI path, instead of silently defaulting to today.
     const bareDayMatch = norm.match(/\bdia\s+(\d{1,2})\b/)!;
     targetDay = parseInt(bareDayMatch[1], 10);
+  } else if (weekdayMatch) {
+    const targetWeekday = WEEKDAY_MAP[weekdayMatch[1]];
+    const d = new Date();
+    // Nearest future occurrence; if today already is that weekday, "sexta" said on a
+    // Friday means the next one, not "right now" (which would just be "hoje").
+    let daysAhead = (targetWeekday - d.getDay() + 7) % 7;
+    if (daysAhead === 0) daysAhead = 7;
+    d.setDate(d.getDate() + daysAhead);
+    targetYear = d.getFullYear();
+    targetMonth = d.getMonth();
+    targetDay = d.getDate();
   } else if (norm.includes('ontem')) {
     const d = new Date();
     d.setDate(d.getDate() - 1);
@@ -339,6 +366,8 @@ export function segmentIntentionClauses(rawQuery: string): IntentionSegment[] {
     } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei|tomo|tomar)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
       domain = 'MEDS';
     } else if ((/\b(peso|altura|idade|anos)\b/.test(cNorm) && (cNorm.includes('meu') || cNorm.includes('minha') || cNorm.includes('corrija') || cNorm.includes('corrige') || cNorm.includes('tenho') || cNorm.includes('kg') || cNorm.includes('cm')))) {
+      domain = 'PROFILE';
+    } else if (/\bpassos?\b/.test(cNorm) && /\b(meta|objetivo|aument|diminu|defin|mude|mudar|altere|alterar|quero|coloque|coloca)\b/.test(cNorm)) {
       domain = 'PROFILE';
     } else if (/\btema\b/.test(cNorm) && /\b(troc|mud|altern)/.test(cNorm)) {
       domain = 'THEME';
@@ -808,6 +837,8 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
     const heightMatch = cNorm.match(/(\d+)\s*cm/);
     // "corrige minha idade pra 33", "tenho 32 anos" — either wording for age
     const ageMatch = cNorm.match(/(?:idade\D{0,10}|tenho\s+)(\d{1,3})\s*(?:anos)?\b/) || cNorm.match(/(\d{1,3})\s*anos\b/);
+    // "meta de passos para 10000", "quero caminhar 8000 passos por dia", "aumente meus passos para 12000"
+    const stepGoalMatch = cNorm.match(/(\d{3,6})\s*passos/) || cNorm.match(/passos\D{0,15}(\d{3,6})/);
 
     // Extract goal change
     let goalProfile: string | undefined;
@@ -844,7 +875,8 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
       weightProfile: weightMatch ? parseFloat(weightMatch[1]) : undefined,
       heightProfile: heightMatch ? parseInt(heightMatch[1], 10) : undefined,
       ageProfile: ageMatch ? parseInt(ageMatch[1], 10) : undefined,
-      goalProfile
+      goalProfile,
+      stepGoalProfile: stepGoalMatch ? parseInt(stepGoalMatch[1], 10) : undefined
     };
   }
 
@@ -1150,6 +1182,12 @@ export function classifyAndExecuteQuery(
         isMutation = true;
         actionsTaken.push('updateProfileGoal');
         logMessages.push(`🎯 **Perfil:** ✔ Objetivo atualizado para **${plan.goalProfile}** na Base Central`);
+      }
+      if (plan.stepGoalProfile) {
+        ctx.updateProfile({ stepGoal: plan.stepGoalProfile });
+        isMutation = true;
+        actionsTaken.push('updateProfileStepGoal');
+        logMessages.push(`👣 **Perfil:** ✔ Meta de passos atualizada para **${plan.stepGoalProfile}** na Base Central`);
       }
       continue;
     }

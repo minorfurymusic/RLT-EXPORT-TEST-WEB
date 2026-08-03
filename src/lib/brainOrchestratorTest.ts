@@ -231,6 +231,46 @@ export function runFullTransactionalTestSuite() {
     details: `Relatório de Governança V3 gerado com prova de utilização: ${govPassed}`
   });
 
+  // ==========================================
+  // CENÁRIO 9 — META DE PASSOS
+  // ==========================================
+  classifyAndExecuteQuery('Aumente minha meta de passos para 12000', getCtx());
+  const stepGoalOk = profile.stepGoal === 12000;
+
+  results.push({
+    suite: 'Cenário 9',
+    name: 'Perfil — Meta de Passos (Atualização via Cérebro)',
+    passed: stepGoalOk,
+    details: `Meta de passos atualizada para 12000: ${stepGoalOk}`
+  });
+
+  // ==========================================
+  // CENÁRIO 10 — DATA POR DIA DA SEMANA ("sexta que vem")
+  // ==========================================
+  events = [];
+  classifyAndExecuteQuery('Marque cardiologista sexta que vem às 10h.', getCtx());
+  const weekdayEvent = events[0];
+
+  const today = new Date();
+  const expectedFriday = new Date(today);
+  let daysAhead = (5 - today.getDay() + 7) % 7;
+  if (daysAhead === 0) daysAhead = 7;
+  expectedFriday.setDate(expectedFriday.getDate() + daysAhead);
+  const expectedDateStr = `${expectedFriday.getFullYear()}-${String(expectedFriday.getMonth() + 1).padStart(2, '0')}-${String(expectedFriday.getDate()).padStart(2, '0')}`;
+  const todayDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const weekdayOk = !!weekdayEvent &&
+    weekdayEvent.title.includes('Cardiologista') &&
+    weekdayEvent.date.includes(expectedDateStr) &&
+    !weekdayEvent.date.includes(todayDateStr);
+
+  results.push({
+    suite: 'Cenário 10',
+    name: 'Agenda — Data por Dia da Semana ("sexta que vem" não vira hoje)',
+    passed: weekdayOk,
+    details: `Agendado para ${expectedDateStr} (não ${todayDateStr}): ${weekdayOk}`
+  });
+
   const allPassed = results.every(r => r.passed);
 
   return {
