@@ -100,6 +100,14 @@ export default function Exercises() {
   const todaySteps = sensorSteps;
   const stepGoalAchieved = todaySteps >= profile.stepGoal;
 
+  const [healthConnectStatus, setHealthConnectStatus] = useState<'idle' | 'connecting' | 'connected' | 'unavailable'>('idle');
+
+  const handleConnectHealthConnect = async () => {
+    setHealthConnectStatus('connecting');
+    const granted = await sensorService.requestHealthConnectPermission();
+    setHealthConnectStatus(granted ? 'connected' : 'unavailable');
+  };
+
   const handleRequestPermission = async () => {
     const granted = await requestSensorPermission();
     if (granted) {
@@ -294,12 +302,28 @@ export default function Exercises() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {healthConnectStatus !== 'connected' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConnectHealthConnect();
+                          }}
+                          disabled={healthConnectStatus === 'connecting'}
+                          className="text-[10px] font-extrabold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50"
+                        >
+                          {healthConnectStatus === 'connecting'
+                            ? (appLanguage === 'pt-BR' ? 'Conectando...' : 'Connecting...')
+                            : healthConnectStatus === 'unavailable'
+                            ? (appLanguage === 'pt-BR' ? 'Health Connect indisponível' : 'Health Connect unavailable')
+                            : (appLanguage === 'pt-BR' ? 'Conectar Health Connect' : 'Connect Health Connect')}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           const input = window.prompt(
-                            appLanguage === 'pt-BR' 
-                              ? 'Digite o total de passos medidos pelo seu celular (Samsung Health / Google Fit):' 
+                            appLanguage === 'pt-BR'
+                              ? 'Digite o total de passos medidos pelo seu celular (Samsung Health / Google Fit):'
                               : 'Enter total steps recorded by your phone (Samsung Health / Google Fit):',
                             todaySteps.toString()
                           );
