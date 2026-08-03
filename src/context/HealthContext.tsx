@@ -236,15 +236,10 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     const saved = safeLocalStorage.getItem('health_profile');
     const hasCompletedSaved = safeLocalStorage.getItem('hasCompletedOnboarding');
     const defaultProfile = {
-      name: 'Usuário RLT',
-      email: 'usuario.rlt@gmail.com',
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
-      onboardingCompleted: true,
-      age: 30,
-      weight: 75,
-      height: 175,
-      bodyFatPercentage: 18,
-      sex: 'Male',
+      name: '',
+      email: '',
+      avatar: null,
+      onboardingCompleted: false,
       stepGoal: 8000,
       workActivityType: 'Sedentary',
       sleepQuality: 'Good',
@@ -253,7 +248,7 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       occupation: '',
       biometricEnabled: false,
     };
-    
+
     let parsed: any = null;
     try {
       parsed = saved ? JSON.parse(saved) : null;
@@ -261,7 +256,10 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       parsed = null;
     }
 
-    let onboardingCompleted = true;
+    // Genuinely fresh install (no saved profile at all): must go through
+    // onboarding instead of silently inheriting a stranger's placeholder
+    // name/age/weight, which is what "onboardingCompleted: true" used to do.
+    let onboardingCompleted = false;
     if (hasCompletedSaved !== null) {
       onboardingCompleted = hasCompletedSaved === 'true';
     } else if (parsed) {

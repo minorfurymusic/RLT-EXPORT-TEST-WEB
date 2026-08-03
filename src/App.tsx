@@ -2,7 +2,6 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Onboarding from './components/Onboarding';
-import Login from './components/Login';
 import { HealthProvider, useHealth } from './context/HealthContext';
 
 // Route screens are loaded on demand instead of all up front — the first
@@ -35,19 +34,13 @@ function RouteLoadingFallback() {
 }
 
 function AppRoutes() {
-  const { profile, appLanguage, googleUser } = useHealth();
+  const { profile, appLanguage } = useHealth();
 
-  if (!googleUser) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white font-sans" dir={appLanguage === 'ar-SA' ? 'rtl' : 'ltr'}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </div>
-    );
-  }
-
+  // Google sign-in is only needed for the optional Google Calendar sync
+  // (Calendar.tsx has its own Conectar/Desconectar toggle for that) — it
+  // must never gate the whole app, since it doesn't work at all inside the
+  // Capacitor WebView the installed APK runs in (Google blocks OAuth from
+  // embedded WebViews). Onboarding is the only real first-run gate.
   if (!profile.onboardingCompleted) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white font-sans" dir={appLanguage === 'ar-SA' ? 'rtl' : 'ltr'}>
