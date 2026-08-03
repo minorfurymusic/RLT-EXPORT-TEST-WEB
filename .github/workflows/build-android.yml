@@ -22,11 +22,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Set up JDK 17
+      # @capacitor/android's own build.gradle hardcodes sourceCompatibility/
+      # targetCompatibility to Java 21 (node_modules/@capacitor/android/capacitor/build.gradle)
+      # — JDK 17 fails with "invalid source release: 21". Match it here.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
