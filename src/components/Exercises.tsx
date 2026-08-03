@@ -495,14 +495,21 @@ export default function Exercises() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
                           onClick={() => {
-                            const ex = EXERCISE_LIBRARY.find(e => e.id === log.exerciseId);
-                            if (ex) {
-                              setSelectedExerciseForLog(ex);
-                              setEditingLog(log);
-                              setIsGymLogOpen(true);
-                            }
+                            // Logs created by the Cérebro (AI) only carry exerciseName/muscleGroup,
+                            // not a matching EXERCISE_LIBRARY id — fall back to a synthetic entry
+                            // built from the log itself so editing still works for those.
+                            const ex = EXERCISE_LIBRARY.find(e => e.id === log.exerciseId) || {
+                              id: log.exerciseId || log.id,
+                              name: log.exerciseName,
+                              muscleGroup: log.muscleGroup,
+                              equipment: '',
+                              illustration: '💪'
+                            };
+                            setSelectedExerciseForLog(ex);
+                            setEditingLog(log);
+                            setIsGymLogOpen(true);
                           }}
                           className="p-2 text-primary hover:bg-primary/5 rounded-full transition-colors"
                           title={t('exercises.editExercise')}

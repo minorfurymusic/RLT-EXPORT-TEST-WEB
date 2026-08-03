@@ -1032,12 +1032,19 @@ export function classifyAndExecuteQuery(
           logMessages.push(`🏋️ **Exercício:** ✔ Treino/Exercício "${targetLog.exerciseName}" removido da Base Central`);
         }
       } else if (ctx.addGymLog) {
+        // Rough volume-based estimate (total kg moved relative to body weight) instead of
+        // a flat number — not as precise as the app's own MET calculator (Exercises.tsx),
+        // but it scales with the actual exercise instead of being identical for every log.
+        const totalVolume = (plan.sets || 1) * (plan.reps || 10) * (plan.weightKg || 20);
+        const bodyWeight = ctx.profile?.weight || 75;
+        const estimatedCalories = Math.max(20, Math.round((totalVolume / bodyWeight) * 3.5));
+
         ctx.addGymLog({
           exerciseId: 'ex_' + Date.now(),
           exerciseName: plan.exerciseName || 'Supino Reto',
           muscleGroup: plan.muscleGroup || 'Peito',
           sets: Array.from({ length: plan.sets || 1 }, () => ({ reps: plan.reps || 10, weight: plan.weightKg || 20 })),
-          caloriesBurned: 200,
+          caloriesBurned: estimatedCalories,
           date: new Date().toISOString()
         });
         isMutation = true;
