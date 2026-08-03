@@ -71,14 +71,13 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
       console.warn('Sensor permission notice:', e);
     }
 
-    // 1b. Health Connect (Opção B) — optional, only asked on native Android and
-    // only if Health Connect is installed; silently skipped otherwise so this
-    // never blocks the rest of the permissions flow.
-    try {
-      await withTimeout(sensorService.requestHealthConnectPermission(), { granted: false, status: 'not_supported' as const }, 3000);
-    } catch (e) {
-      console.warn('Health Connect permission notice:', e);
-    }
+    // Health Connect (Opção B) is intentionally NOT requested here. Its
+    // permission screen opens a separate, slow, full-screen system Activity —
+    // racing it against a short withTimeout (like every other permission
+    // below) meant the JS side gave up and fired the NEXT permission request
+    // while that Activity was still on screen, breaking the whole sequence.
+    // It has its own dedicated "Conectar Health Connect" button in
+    // Exercícios (Exercises.tsx) that awaits the real response with no timeout.
 
     // 2. Notification API
     try {
