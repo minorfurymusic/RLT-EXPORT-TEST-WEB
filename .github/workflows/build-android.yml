@@ -1,13 +1,21 @@
 name: Build Android APK
 
 # Builds a debug .apk on every push to main and lets you trigger it
-# manually from the Actions tab. The finished file shows up as a
-# downloadable "artifact" on the run's summary page — no local Android
-# Studio needed.
+# manually from the Actions tab. The finished file is published as a
+# GitHub Release asset (a direct .apk download link, not a zip) — no
+# local Android Studio needed.
+#
+# Why a Release instead of a plain workflow artifact: Chrome/Safe Browsing
+# tends to flag a .zip containing an .apk from an unfamiliar link as a false
+# positive ("Vírus detectado"). A Release asset is a direct, unwrapped .apk
+# download through GitHub's own release CDN, which doesn't hit that heuristic.
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -49,9 +57,24 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK (build history / workflow artifact)
         uses: actions/upload-artifact@v4
         with:
           name: RealLifeTrack-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Rolling "debug-latest" release, recreated on every build, so there's
+      # always one stable direct-download link for the APK — see the note
+      # at the top of this file for why this replaced a plain artifact link.
+      - name: Publish APK as a GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete debug-latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create debug-latest \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "RLT Debug APK (build mais recente)" \
+            --notes "Build automático a partir do commit ${{ github.sha }}. Debug build, não assinado para produção — apenas para teste." \
+            --prerelease
