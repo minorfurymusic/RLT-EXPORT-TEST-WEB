@@ -56,57 +56,58 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
     setIsGranting(true);
     setGrantSuccess(false);
 
-    // Timeout helper to ensure NO promise ever hangs the UI
-    const withTimeout = <T,>(promise: Promise<T>, fallback: T, ms = 1500): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
-      ]);
-    };
+    // Each of these used to be raced against a 1000ms timeout that resolved
+    // to "granted" on its own, regardless of what the user actually did with
+    // the real system dialog — which is why the UI could show everything as
+    // "Liberado" while a real, unanswered Android permission dialog was still
+    // sitting on screen behind it. Now each flag reflects the real resolved
+    // result, and nothing is marked granted until the OS actually says so.
 
-    // 1. Motion / Step Counter sensor
+    // 1. Motion / Step Counter sensor — Android doesn't gate this behind a
+    // runtime dialog, so this normally resolves immediately either way.
+    let sensorOk = false;
     try {
-      await withTimeout(sensorService.requestPermission(), true, 1000);
+      sensorOk = await sensorService.requestPermission();
     } catch (e) {
       console.warn('Sensor permission notice:', e);
     }
+    setSensorGranted(sensorOk);
 
-    // Health Connect (Opção B) is intentionally NOT requested here. Its
-    // permission screen opens a separate, slow, full-screen system Activity —
-    // racing it against a short withTimeout (like every other permission
-    // below) meant the JS side gave up and fired the NEXT permission request
-    // while that Activity was still on screen, breaking the whole sequence.
-    // It has its own dedicated "Conectar Health Connect" button in
-    // Exercícios (Exercises.tsx) that awaits the real response with no timeout.
+    // Health Connect (Opção B) is intentionally NOT requested here — its
+    // permission screen is a separate, slow, full-screen system Activity that
+    // doesn't belong in this quick sequence. It has its own dedicated
+    // "Conectar Health Connect" button in Exercícios (Exercises.tsx).
 
-    // 2. Notification API
+    // 2. Notification API — waits for the real dialog response.
+    let notificationOk = false;
     try {
       if ('Notification' in window) {
-        await withTimeout(Notification.requestPermission(), 'granted', 1000);
+        const result = await Notification.requestPermission();
+        notificationOk = result === 'granted';
       }
     } catch (e) {
       console.warn('Notification permission notice:', e);
     }
+    setNotificationGranted(notificationOk);
 
-    // 3. Location / GPS
+    // 3. Location / GPS — locationService.requestPermission() already has its
+    // own internal 2s timeout as a safety net; no need to race it again here.
+    let locationOk = false;
     try {
-      await withTimeout(locationService.requestPermission(), true, 1000);
+      locationOk = await locationService.requestPermission();
     } catch (e) {
       console.warn('Location permission notice:', e);
     }
+    setLocationGranted(locationOk);
 
-    setSensorGranted(true);
-    setNotificationGranted(true);
-    setLocationGranted(true);
-
-    // Save state
-    const states = { sensor: true, notification: true, location: true };
+    // Save the real outcome, not a blanket "everything worked".
+    const states = { sensor: sensorOk, notification: notificationOk, location: locationOk };
     safeLocalStorage.setItem('health_permissions_prompted', 'true');
-    safeLocalStorage.setItem('health_permissions_granted', 'true');
+    safeLocalStorage.setItem('health_permissions_granted', String(sensorOk && notificationOk && locationOk));
     safeLocalStorage.setItem('health_permission_states', JSON.stringify(states));
 
     setIsGranting(false);
-    setGrantSuccess(true);
+    setGrantSuccess(sensorOk && notificationOk && locationOk);
 
     setTimeout(() => {
       setGrantSuccess(false);
