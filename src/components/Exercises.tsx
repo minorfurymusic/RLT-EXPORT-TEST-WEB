@@ -100,12 +100,18 @@ export default function Exercises() {
   const todaySteps = sensorSteps;
   const stepGoalAchieved = todaySteps >= profile.stepGoal;
 
-  const [healthConnectStatus, setHealthConnectStatus] = useState<'idle' | 'connecting' | 'connected' | 'unavailable'>('idle');
+  const [healthConnectStatus, setHealthConnectStatus] = useState<'idle' | 'connecting' | 'connected' | 'not_installed' | 'not_supported'>('idle');
 
   const handleConnectHealthConnect = async () => {
     setHealthConnectStatus('connecting');
-    const granted = await sensorService.requestHealthConnectPermission();
-    setHealthConnectStatus(granted ? 'connected' : 'unavailable');
+    const { granted, status } = await sensorService.requestHealthConnectPermission();
+    if (granted) {
+      setHealthConnectStatus('connected');
+    } else if (status === 'not_installed') {
+      setHealthConnectStatus('not_installed');
+    } else {
+      setHealthConnectStatus('not_supported');
+    }
   };
 
   const handleRequestPermission = async () => {
@@ -302,7 +308,17 @@ export default function Exercises() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {healthConnectStatus !== 'connected' && (
+                      {healthConnectStatus === 'not_installed' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sensorService.openHealthConnectInstallPage();
+                          }}
+                          className="text-[10px] font-extrabold text-amber-600 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-2.5 py-1 rounded-full transition-colors"
+                        >
+                          {appLanguage === 'pt-BR' ? 'Instalar Health Connect' : 'Install Health Connect'}
+                        </button>
+                      ) : healthConnectStatus !== 'connected' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -313,7 +329,7 @@ export default function Exercises() {
                         >
                           {healthConnectStatus === 'connecting'
                             ? (appLanguage === 'pt-BR' ? 'Conectando...' : 'Connecting...')
-                            : healthConnectStatus === 'unavailable'
+                            : healthConnectStatus === 'not_supported'
                             ? (appLanguage === 'pt-BR' ? 'Health Connect indisponível' : 'Health Connect unavailable')
                             : (appLanguage === 'pt-BR' ? 'Conectar Health Connect' : 'Connect Health Connect')}
                         </button>

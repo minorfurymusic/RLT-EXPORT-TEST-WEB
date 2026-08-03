@@ -4,7 +4,7 @@ import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { safeLocalStorage } from '../lib/utils';
-import { StepTracker } from './nativeStepBridge';
+import { StepTracker, HealthConnectStatus } from './nativeStepBridge';
 
 export interface StepSensorData {
   steps: number;
@@ -123,17 +123,27 @@ class SensorService {
   }
 
   /** Prompts the user for Health Connect read access (Opção B) — safe to call repeatedly. */
-  public async requestHealthConnectPermission(): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) return false;
+  public async requestHealthConnectPermission(): Promise<{ granted: boolean; status: HealthConnectStatus }> {
+    if (!Capacitor.isNativePlatform()) return { granted: false, status: 'not_supported' };
     try {
-      const { available } = await StepTracker.isHealthConnectAvailable();
-      if (!available) return false;
+      const { status } = await StepTracker.isHealthConnectAvailable();
+      if (status !== 'available') return { granted: false, status };
       const { granted } = await StepTracker.requestHealthConnectPermission();
       if (granted) void this.syncFromNativeSources();
-      return granted;
+      return { granted, status: 'available' };
     } catch (e) {
       console.warn('Health Connect permission request failed:', e);
-      return false;
+      return { granted: false, status: 'not_supported' };
+    }
+  }
+
+  /** Opens the Play Store listing for Health Connect (only meaningful when status is 'not_installed'). */
+  public async openHealthConnectInstallPage(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      await StepTracker.openHealthConnectInstallPage();
+    } catch (e) {
+      console.warn('Could not open Health Connect install page:', e);
     }
   }
 

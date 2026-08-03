@@ -75,7 +75,7 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
     // only if Health Connect is installed; silently skipped otherwise so this
     // never blocks the rest of the permissions flow.
     try {
-      await withTimeout(sensorService.requestHealthConnectPermission(), false, 3000);
+      await withTimeout(sensorService.requestHealthConnectPermission(), { granted: false, status: 'not_supported' as const }, 3000);
     } catch (e) {
       console.warn('Health Connect permission notice:', e);
     }

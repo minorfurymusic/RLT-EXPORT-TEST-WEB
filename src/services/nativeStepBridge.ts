@@ -8,12 +8,16 @@ import { registerPlugin } from '@capacitor/core';
  * Only registered/usable on Android — sensorService.ts falls back to the
  * existing DeviceMotion-based JS counting everywhere else (web preview, iOS).
  */
+export type HealthConnectStatus = 'available' | 'not_installed' | 'not_supported';
+
 export interface StepTrackerPlugin {
   startTracking(): Promise<void>;
   getSteps(): Promise<{ steps: number }>;
-  isHealthConnectAvailable(): Promise<{ available: boolean }>;
-  requestHealthConnectPermission(): Promise<{ granted: boolean }>;
+  isHealthConnectAvailable(): Promise<{ available: boolean; status: HealthConnectStatus }>;
+  requestHealthConnectPermission(): Promise<{ granted: boolean; status?: HealthConnectStatus }>;
   getHealthConnectSteps(): Promise<{ steps: number }>;
+  /** Opens the Play Store listing for Health Connect (status === 'not_installed'). */
+  openHealthConnectInstallPage(): Promise<void>;
 }
 
 export const StepTracker = registerPlugin<StepTrackerPlugin>('StepTracker');
