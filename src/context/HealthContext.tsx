@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { HealthRecord, Notification, CalendarEvent, UserProfile, HealthGoal, Meal, WaterLog, ExerciseRoutine, GymWorkoutLog, ActivityTracking, HistoryRecord, HistoryCategory, StressReportRecord, MentalHealthResponse, GymWorkoutSession, PerformanceSnapshot, RadarChartAxes, AIBiofeedbackReport, RoutineVitalsRecord, AdherenceLog } from '../types';
+import { HealthRecord, Notification, CalendarEvent, UserProfile, HealthGoal, Meal, WaterLog, ExerciseRoutine, GymWorkoutLog, ActivityTracking, HistoryRecord, HistoryCategory, StressReportRecord, MentalHealthResponse, GymWorkoutSession, PerformanceSnapshot, RadarChartAxes, AIBiofeedbackReport, RoutineVitalsRecord, AdherenceLog, AccentColor, ACCENT_COLORS } from '../types';
 import { cleanAiResponse, safeJsonParse, generateMedicationInsights, getGoogleGenAI } from '../lib/ai';
 import { anonymizeProfile } from '../lib/lgpd';
 import { Language, getTranslation } from '../lib/i18n';
@@ -63,6 +63,8 @@ interface HealthContextType {
   setAvatar: (avatar: string | null) => void;
   toggleDarkMode: () => void;
   setDarkMode: (value: boolean) => void;
+  accentColor: AccentColor;
+  setAccentColor: (color: AccentColor) => void;
   // Meal CRUD
   addMeal: (meal: Omit<Meal, 'id'>) => void;
   updateMeal: (id: string, meal: Partial<Meal>) => void;
@@ -742,6 +744,11 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false);
   });
 
+  const [accentColor, setAccentColor] = useState<AccentColor>(() => {
+    const saved = safeLocalStorage.getItem('health_accent_color') as AccentColor | null;
+    return saved && ACCENT_COLORS.includes(saved) ? saved : 'indigo';
+  });
+
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => {
     return safeLocalStorage.getParsed<string[]>('health_dismissed_notifications', []);
   });
@@ -803,6 +810,11 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    safeLocalStorage.setItem('health_accent_color', accentColor);
+    document.documentElement.setAttribute('data-accent', accentColor);
+  }, [accentColor]);
 
   useEffect(() => {
     if (googleUser) {
@@ -2025,6 +2037,8 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       setAvatar,
       toggleDarkMode,
       setDarkMode,
+      accentColor,
+      setAccentColor,
       addMeal,
       updateMeal,
       deleteMeal,

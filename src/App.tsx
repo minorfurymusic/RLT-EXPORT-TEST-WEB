@@ -19,6 +19,7 @@ const Calendar = lazy(() => import('./components/Calendar'));
 const Profile = lazy(() => import('./components/Profile'));
 const WaterTracking = lazy(() => import('./components/WaterTracking'));
 const PrivacySecurity = lazy(() => import('./components/PrivacySecurity'));
+const Personalize = lazy(() => import('./components/Personalize'));
 const LanguageRegional = lazy(() => import('./components/LanguageRegional'));
 const HelpSupport = lazy(() => import('./components/HelpSupport'));
 const PerformanceDashboard = lazy(() =>
@@ -75,6 +76,7 @@ function AppRoutes() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="profile" element={<Profile />} />
             <Route path="profile/privacy" element={<PrivacySecurity />} />
+            <Route path="profile/personalize" element={<Personalize />} />
             <Route path="profile/language" element={<LanguageRegional />} />
             <Route path="profile/help" element={<HelpSupport />} />
             <Route path="performance" element={<PerformanceDashboard />} />

@@ -1,3 +1,6 @@
+export type AccentColor = 'indigo' | 'coral' | 'oliva' | 'petroleo' | 'ameixa';
+export const ACCENT_COLORS: AccentColor[] = ['indigo', 'coral', 'oliva', 'petroleo', 'ameixa'];
+
 export interface Notification {
   id: string;
   title: string;

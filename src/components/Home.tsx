@@ -26,12 +26,14 @@ import {
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { Share2 } from 'lucide-react';
 import { useHealth } from '../context/HealthContext';
 import { cn } from '../lib/utils';
 import { safeJsonParse, getGoogleGenAI } from '../lib/ai';
 import { MentalHealthResponse } from '../types';
 import { anonymizeProfile } from '../lib/lgpd';
 import { useRegisterComponentRuntime } from '../lib/version';
+import ShareModal from './ShareModal';
 
 export default function Home() {
   useRegisterComponentRuntime('Home');
@@ -65,6 +67,7 @@ export default function Home() {
   } = useHealth();
   
   const [view, setView] = useState<'main' | 'mental'>('main');
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const targetDate = new Date(selectedDate + 'T12:00:00');
   const targetDateStr = targetDate.toDateString();
@@ -271,37 +274,50 @@ export default function Home() {
       {/* Health Score */}
       {!isProfileIncomplete && (
         <section className="px-6 mb-6">
-          <button 
-            id="btn-health-checkin"
-            onClick={handleCheckInStart}
-            className="w-full text-left bg-white dark:bg-slate-900 p-6 rounded-3xl border border-primary/10 shadow-sm flex items-center justify-between group transition-all hover:bg-primary/5"
-          >
-            <div className="flex-1">
-              <h2 className="text-lg font-bold">{t('common.healthScore')}</h2>
-              <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">{t('common.healthScoreDesc')}</p>
-              <div className="mt-3 flex items-center gap-2 text-xs font-bold text-primary">
-                {t('common.improveScore')} <ChevronRight className="size-3 group-hover:translate-x-1 transition-transform" />
+          <div className="relative bg-white dark:bg-slate-900 p-6 rounded-3xl border border-primary/10 shadow-sm group transition-all hover:bg-primary/5">
+            <button
+              id="btn-nav-share"
+              onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }}
+              className="absolute top-4 right-4 size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-accent hover:bg-accent-soft transition-colors z-10"
+              title={t('common.shareProgress')}
+              aria-label={t('common.shareProgress')}
+            >
+              <Share2 className="size-4" />
+            </button>
+            <button
+              id="btn-health-checkin"
+              onClick={handleCheckInStart}
+              className="w-full text-left flex items-center justify-between"
+            >
+              <div className="flex-1 pr-10">
+                <h2 className="text-lg font-bold">{t('common.healthScore')}</h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">{t('common.healthScoreDesc')}</p>
+                <div className="mt-3 flex items-center gap-2 text-xs font-bold text-primary">
+                  {t('common.improveScore')} <ChevronRight className="size-3 group-hover:translate-x-1 transition-transform" />
+                </div>
               </div>
-            </div>
-            <div className="relative flex items-center justify-center size-24">
-              <svg className="size-24 transform -rotate-90">
-                <circle className="text-slate-100 dark:text-slate-800" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" strokeWidth="10"></circle>
-                <circle 
-                  className="text-primary transition-all duration-1000" 
-                  cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" strokeWidth="10"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={251.2 - (251.2 * healthScore) / 100}
-                  strokeLinecap="round"
-                ></circle>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-black leading-none">{healthScore}</span>
-                <span className="text-[10px] text-slate-500 uppercase font-bold">/100</span>
+              <div className="relative flex items-center justify-center size-24">
+                <svg className="size-24 transform -rotate-90">
+                  <circle className="text-slate-100 dark:text-slate-800" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" strokeWidth="10"></circle>
+                  <circle
+                    className="text-primary transition-all duration-1000"
+                    cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" strokeWidth="10"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * healthScore) / 100}
+                    strokeLinecap="round"
+                  ></circle>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black leading-none">{healthScore}</span>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">/100</span>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          </div>
         </section>
       )}
+
+      <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} defaultCategory="biostatus" />
 
       {/* Mental Health Score (Conditional) */}
       {(stressManagementGoal || mentalHealthGoal) && (

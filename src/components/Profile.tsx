@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHealth } from '../context/HealthContext';
 import { ChevronRight, Camera, Trash2, ImageIcon, X, Plus, User, Info, Target, Settings, Check, Beef, Droplets, Footprints, Flame, Walk, Stethoscope, Medication, Utensils, Lightbulb, FitnessCenter, Moon, Sun, FileText, Lock, Globe, HelpCircle, Download, Smartphone, CheckCircle2, Key, LogOut, Eye, EyeOff, AlertCircle } from './Icons';
+import { Palette } from 'lucide-react';
 import { cn, safeLocalStorage } from '../lib/utils';
 import { UserProfile, HealthGoal } from '../types';
 import { AI_PROVIDER_PRESETS, type AIProviderId } from '../lib/aiProviders';
@@ -273,7 +274,7 @@ export default function Profile() {
                 <ChevronRight className="size-4 text-slate-400" />
               </button>
 
-              <button 
+              <button
                 onClick={() => navigate('/profile/language')}
                 className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white dark:hover:bg-slate-800 transition-colors group"
               >
@@ -283,6 +284,21 @@ export default function Profile() {
                   </div>
                   <span className="font-medium text-slate-700 dark:text-slate-300 group-hover:text-primary text-sm">
                     {t('profile.language')}
+                  </span>
+                </div>
+                <ChevronRight className="size-4 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => navigate('/profile/personalize')}
+                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white dark:hover:bg-slate-800 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 group-hover:text-accent transition-colors">
+                    <Palette className="size-4" />
+                  </div>
+                  <span className="font-medium text-slate-700 dark:text-slate-300 group-hover:text-accent text-sm">
+                    {t('profile.personalize')}
                   </span>
                 </div>
                 <ChevronRight className="size-4 text-slate-400" />
