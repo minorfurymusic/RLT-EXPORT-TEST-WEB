@@ -312,7 +312,7 @@ export default function Exercises() {
                         }}
                         className="text-[10px] font-extrabold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-full transition-colors"
                       >
-                        {appLanguage === 'pt-BR' ? 'Ajustar / Sincronizar' : 'Adjust Steps'}
+                        {appLanguage === 'pt-BR' ? 'Ajustar manualmente' : 'Adjust manually'}
                       </button>
                       <div className="text-xs font-bold text-emerald-500">
                         {Math.round((todaySteps / profile.stepGoal) * 100)}%
