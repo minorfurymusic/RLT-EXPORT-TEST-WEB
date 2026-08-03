@@ -45,16 +45,14 @@ export default function HelpSupport() {
 
     try {
       const genAI = getGoogleGenAI();
-      const model = "gemini-3.6-flash";
-      
-      const prompt = `You are an AI Health App Tutor. Provide a short, clear tutorial (max 3 sentences) for the following user question: "${searchQuery}". 
+
+      const prompt = `You are an AI Health App Tutor. Provide a short, clear tutorial (max 3 sentences) for the following user question: "${searchQuery}".
       If the question is about "atestado", explain how to use the Smart Scan in the Medical section.
       If it's about "pressao", explain how to check the Routine Vitals dashboard.
       If it's about "medicação", explain how to use the Adherence Log in the Home or Medical section.
       Be helpful and concise.`;
 
       const result = await genAI.models.generateContent({
-        model,
         contents: [{ parts: [{ text: prompt }] }],
       });
       

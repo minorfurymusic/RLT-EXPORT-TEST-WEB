@@ -1710,7 +1710,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     try {
       const ai = getGoogleGenAI();
       const result = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
         contents: [{ parts: [{ text: prompt }] }],
         config: { responseMimeType: "application/json" }
       });

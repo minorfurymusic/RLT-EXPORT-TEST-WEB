@@ -132,13 +132,11 @@ export default function Nutrition() {
         ];
 
         response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
           contents: { parts },
           config: { responseMimeType: "application/json" }
         });
       } else {
         response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
           contents: prompt,
           config: { responseMimeType: "application/json" }
         });

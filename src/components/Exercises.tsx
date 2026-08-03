@@ -1285,7 +1285,6 @@ function OtherRoutineEditor({ routine, onBack, onComplete }: { routine: Exercise
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
         contents: prompt,
       });
       
