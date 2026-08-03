@@ -207,19 +207,11 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     return safeLocalStorage.getParsed<CalendarEvent[]>('health_events', []);
   });
 
-  const DEFAULT_GOOGLE_USER = {
-    uid: 'google-user-local-default',
-    displayName: 'Usuário RLT',
-    email: 'usuario.rlt@gmail.com',
-    photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    emailVerified: true,
-  };
-
   const [googleUser, setGoogleUser] = useState<any | null>(() => {
-    return safeLocalStorage.getParsed<any>('google_user', DEFAULT_GOOGLE_USER);
+    return safeLocalStorage.getParsed<any>('google_user', null);
   });
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() => {
-    return safeLocalStorage.getItem('google_access_token') || 'rlt_local_google_token_active';
+    return safeLocalStorage.getItem('google_access_token');
   });
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -988,6 +980,14 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Failed to connect Google Calendar:", err);
+      addNotification({
+        title: appLanguage === 'pt-BR' ? 'Não foi possível conectar ao Google' : 'Could not connect to Google',
+        description: appLanguage === 'pt-BR'
+          ? 'O login com o Google não funciona dentro do app instalado. Tente novamente ou entre em contato com o suporte.'
+          : 'Google sign-in does not work inside the installed app. Please try again or contact support.',
+        time: new Date().toISOString(),
+        type: 'system',
+      });
     } finally {
       setIsSyncing(false);
     }

@@ -1,53 +1,33 @@
 import { jsonrepair } from "jsonrepair";
 import { redactImagePII } from "./lgpd";
 import { logError } from "./logger";
-import { loadAIProviderConfig, resolveEndpoint } from "./aiProviders";
+import { runGenericAI } from "./brainEngine";
 
 /**
- * Provider-agnostic AI client. The key never leaves the browser except inside
- * this request to our own /api/ai proxy — there's no client-side SDK fallback
- * anymore (there used to be a direct Google SDK call here, which meant a
- * build-time GEMINI_API_KEY got baked into the JS bundle in plain text; that
- * risk is gone now that every call goes through the server).
+ * Provider-agnostic AI client. Calls the configured provider directly from
+ * the browser with the user's own key — no server in between. There used to
+ * be a direct Google SDK call here too, which meant a build-time
+ * GEMINI_API_KEY got baked into the JS bundle in plain text; that's not a
+ * risk here since this uses the key the user typed into Perfil, not a
+ * secret embedded at build time.
  */
 export function getGoogleGenAI(): any {
   return {
     models: {
       generateContent: async (params: { model?: string; contents: any; config?: any }) => {
-        const stored = loadAIProviderConfig();
-        const { baseUrl, model } = stored ? resolveEndpoint(stored) : { baseUrl: undefined, model: undefined };
-
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider: stored?.provider,
-            apiKey: stored?.apiKey,
-            baseUrl,
-            model: params.model || model,
-            contents: params.contents,
-            config: params.config
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          const errorMsg = data.message || `Erro ao chamar a IA (${response.status})`;
+        try {
+          const result = await runGenericAI({ contents: params.contents, config: params.config, model: params.model });
+          return result;
+        } catch (err: any) {
+          const errorMsg = err?.message || 'Erro ao chamar a IA';
           logError({
             type: 'ai',
-            module: 'AI Proxy /api/ai',
+            module: 'brainEngine.runGenericAI',
             message: errorMsg,
-            metadata: { status: response.status, model: params?.model, provider: stored?.provider },
+            metadata: { model: params?.model },
           });
           throw new Error(errorMsg);
         }
-
-        return {
-          text: data.text || "",
-          candidates: data.candidates || [],
-          usageMetadata: data.usageMetadata || null,
-        };
       }
     }
   };

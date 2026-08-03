@@ -45,21 +45,6 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error: any) {
-    console.warn('Google sign-in popup/network constrained in preview, activating local Google session mode:', error?.message || error);
-    
-    // Create a resilient fallback local Google user when popups or network calls fail in iframe preview environment
-    const fallbackUser = {
-      uid: 'google-user-local-' + Math.random().toString(36).substring(2, 9),
-      displayName: 'Usuário RLT (Google)',
-      email: 'usuario.rlt@gmail.com',
-      photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      emailVerified: true,
-      providerData: [{ providerId: 'google.com', email: 'usuario.rlt@gmail.com' }]
-    } as unknown as User;
-
-    cachedAccessToken = 'rlt_local_google_token_active';
-    return { user: fallbackUser, accessToken: cachedAccessToken };
   } finally {
     isSigningIn = false;
   }
@@ -119,7 +104,7 @@ export function parseDateAndTime(dateStr: string, timeStr: string): Date {
 
 // Fetch Google Calendar events
 export const fetchGoogleEvents = async (accessToken: string, timeMin?: string): Promise<any[]> => {
-  if (!accessToken || accessToken === 'rlt_local_google_token_active') {
+  if (!accessToken) {
     return [];
   }
   try {
@@ -159,7 +144,7 @@ export const createGoogleEvent = async (accessToken: string, event: Omit<Calenda
   const start = parseDateAndTime(event.date, event.time);
   const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration default
 
-  if (!accessToken || accessToken === 'rlt_local_google_token_active') {
+  if (!accessToken) {
     return 'local_g_event_' + Math.random().toString(36).substring(2, 9);
   }
 
@@ -199,7 +184,7 @@ export const createGoogleEvent = async (accessToken: string, event: Omit<Calenda
 
 // Delete an event on Google Calendar
 export const deleteGoogleEvent = async (accessToken: string, googleEventId: string): Promise<void> => {
-  if (!accessToken || accessToken === 'rlt_local_google_token_active' || googleEventId.startsWith('local_g_event_')) {
+  if (!accessToken || googleEventId.startsWith('local_g_event_')) {
     return;
   }
   try {

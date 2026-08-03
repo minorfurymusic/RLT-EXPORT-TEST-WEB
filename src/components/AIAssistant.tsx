@@ -10,6 +10,7 @@ import { getGoogleGenAI } from '../lib/ai';
 import { compressImageIfNeeded } from '../lib/imageCompressor';
 import { safeLocalStorage } from '../lib/utils';
 import { classifyAndExecuteQuery } from '../lib/brainOrchestrator';
+import { runBrain } from '../lib/brainEngine';
 import { runFullTransactionalTestSuite } from '../lib/brainOrchestratorTest';
 
 interface ChatMessage {
@@ -383,24 +384,11 @@ export default function AIAssistant() {
 
       let brainData: any;
       try {
-        const brainRes = await fetch('/api/brain', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: messageText,
-            healthContextSnapshot,
-            sessionId: activeSession.id
-          })
+        brainData = await runBrain({
+          message: messageText,
+          healthContextSnapshot,
+          sessionId: activeSession.id
         });
-
-        if (!brainRes.ok) {
-          const errJson = await brainRes.json().catch(() => ({}));
-          throw new Error(errJson.message || `Erro no Cérebro (${brainRes.status})`);
-        }
-
-        brainData = await brainRes.json();
       } catch (aiError: any) {
         // The AI is the primary interpreter now — the local regex orchestrator only
         // steps in here, as a fallback, when it genuinely couldn't be reached
