@@ -481,8 +481,7 @@ export default function AIAssistant() {
               time: payload.time || '08:00',
               completed: Boolean(payload.completed),
               type: payload.routineType || 'other',
-              repeat: payload.repeat || 'Every day',
-              stepGoal: payload.stepGoal
+              repeat: payload.repeat || 'Every day'
             };
             addRoutine(routineData);
             appliedLogs.push(`• **Treino:** Rotina "${routineData.name}" criada`);

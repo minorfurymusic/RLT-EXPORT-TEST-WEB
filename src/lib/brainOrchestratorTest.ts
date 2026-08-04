@@ -19,7 +19,6 @@ export function runFullTransactionalTestSuite() {
     height: 178,
     weight: 82,
     sex: 'Male',
-    stepGoal: 10000,
     units: 'metric',
     goal: 'Muscle Gain'
   };
@@ -229,19 +228,6 @@ export function runFullTransactionalTestSuite() {
     name: 'RLT Engine V3 (Pipeline de Governança Fases 0-9 & Prova de Uso de 11 Regras)',
     passed: govPassed,
     details: `Relatório de Governança V3 gerado com prova de utilização: ${govPassed}`
-  });
-
-  // ==========================================
-  // CENÁRIO 9 — META DE PASSOS
-  // ==========================================
-  classifyAndExecuteQuery('Aumente minha meta de passos para 12000', getCtx());
-  const stepGoalOk = profile.stepGoal === 12000;
-
-  results.push({
-    suite: 'Cenário 9',
-    name: 'Perfil — Meta de Passos (Atualização via Cérebro)',
-    passed: stepGoalOk,
-    details: `Meta de passos atualizada para 12000: ${stepGoalOk}`
   });
 
   // ==========================================

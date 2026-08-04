@@ -58,8 +58,6 @@ export default function Exercises() {
     gymLogs,
     deleteGymLog,
     addHistoryRecord,
-    sensorSteps,
-    updateSensorSteps,
     requestSensorPermission,
     activeActivity,
     setActiveActivity,
@@ -96,9 +94,6 @@ export default function Exercises() {
       setIsTrackingModalOpen(true);
     }
   }, [activeActivity]);
-
-  const todaySteps = sensorSteps;
-  const stepGoalAchieved = todaySteps >= profile.stepGoal;
 
   const handleRequestPermission = async () => {
     const granted = await requestSensorPermission();
@@ -194,7 +189,7 @@ export default function Exercises() {
             }`}
           >
             <Walk className="size-4" />
-            <span>{appLanguage === 'pt-BR' ? 'Atividades & Rotinas' : 'Routines & Steps'}</span>
+            <span>{appLanguage === 'pt-BR' ? 'Atividades & Rotinas' : 'Routines & Activities'}</span>
           </button>
           <button
             onClick={() => setActiveTab('gym')}
@@ -272,65 +267,9 @@ export default function Exercises() {
                   </motion.div>
                 )}
 
-                {/* Step Goal - Permanent Entity */}
-                <div 
-                  onClick={() => {
-                    const routine = routines.find(r => r.id === 'step-goal-permanent');
-                    if (routine) {
-                      setRoutineToEdit(routine);
-                      setIsRoutineSettingsOpen(true);
-                    }
-                  }}
-                  className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-primary/10 shadow-sm group cursor-pointer hover:bg-primary/5 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="size-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
-                        <Walk className="size-6" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm">{t('exercises.stepGoal')}</h3>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{todaySteps.toLocaleString()} / {profile.stepGoal.toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const input = window.prompt(
-                            appLanguage === 'pt-BR'
-                              ? 'Digite o total de passos medidos pelo seu celular (Samsung Health / Google Fit):'
-                              : 'Enter total steps recorded by your phone (Samsung Health / Google Fit):',
-                            todaySteps.toString()
-                          );
-                          if (input !== null) {
-                            const val = parseInt(input, 10);
-                            if (!isNaN(val) && val >= 0) {
-                              updateSensorSteps(val);
-                            }
-                          }
-                        }}
-                        className="text-[10px] font-extrabold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-full transition-colors"
-                      >
-                        {appLanguage === 'pt-BR' ? 'Ajustar manualmente' : 'Adjust manually'}
-                      </button>
-                      <div className="text-xs font-bold text-emerald-500">
-                        {Math.round((todaySteps / profile.stepGoal) * 100)}%
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (todaySteps / profile.stepGoal) * 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-
                 {/* Scheduled Routines for Today */}
                 {routines.filter(r => {
                   if (r.skippedDates?.includes(new Date().toISOString().split('T')[0])) return false;
-                  if (r.id === 'step-goal-permanent') return false;
                   if (r.isExtra) return true;
                   const today = new Date().toLocaleDateString(appLanguage, { weekday: 'long' });
                   if (typeof r.repeat === 'string' && (r.repeat === 'Every day' || r.repeat === t('exercises.everyDay'))) return true;
@@ -616,8 +555,6 @@ export default function Exercises() {
               setRoutineToEdit(null);
             }} 
             routines={routines}
-            stepGoal={profile.stepGoal}
-            onUpdateStepGoal={(goal) => updateProfile({ stepGoal: goal })}
             onAddRoutine={addRoutine}
             onRemoveRoutine={deleteRoutine}
             onUpdateRoutine={updateRoutine}
@@ -957,7 +894,7 @@ function CardioRoutineEditor({ routine, onBack, onComplete }: { routine: Exercis
       }
 
       // Start Sensor Tracking for Intensity
-      sensorService.startListening(() => {});
+      sensorService.startListening();
 
       timerRef.current = setInterval(() => {
         setDuration(prev => {
@@ -1407,7 +1344,7 @@ function OtherRoutineEditor({ routine, onBack, onComplete }: { routine: Exercise
 
 // --- Modals ---
 
-function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, onAddRoutine, onRemoveRoutine, onUpdateRoutine, routineToEdit, onEditRoutine }: any) {
+function RoutineSettingsModal({ onClose, routines, onAddRoutine, onRemoveRoutine, onUpdateRoutine, routineToEdit, onEditRoutine }: any) {
   const { t, appLanguage } = useHealth();
   const today = new Date().toISOString().split('T')[0];
   const todayWeekday = new Date().toLocaleDateString(appLanguage, { weekday: 'long' });
@@ -1422,14 +1359,13 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
   
   const [newRoutineName, setNewRoutineName] = useState(routineToEdit?.name || t(`exercises.${routineToEdit?.type || 'walking'}`));
   const [newRoutineTime, setNewRoutineTime] = useState(routineToEdit?.time || '08:00');
-  const [newRoutineType, setNewRoutineType] = useState<'walking' | 'running' | 'cycling' | 'gym' | 'steps' | 'other'>(routineToEdit?.type || 'walking');
+  const [newRoutineType, setNewRoutineType] = useState<'walking' | 'running' | 'cycling' | 'gym' | 'other'>(routineToEdit?.type || 'walking');
   const [repeatType, setRepeatType] = useState<'Every day' | 'Monday-Friday' | 'More'>(
     routineToEdit?.repeat === 'Every day' || routineToEdit?.repeat === 'Monday-Friday' 
       ? routineToEdit.repeat 
       : Array.isArray(routineToEdit?.repeat) ? 'More' : 'Every day'
   );
   const [selectedDays, setSelectedDays] = useState<string[]>(Array.isArray(routineToEdit?.repeat) ? routineToEdit.repeat : []);
-  const [tempStepGoal, setTempStepGoal] = useState(routineToEdit?.stepGoal || stepGoal);
 
   useEffect(() => {
     if (routineToEdit) {
@@ -1443,17 +1379,16 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
         setRepeatType('More');
         setSelectedDays(routineToEdit.repeat);
       }
-      setTempStepGoal(routineToEdit.stepGoal || stepGoal);
     } else {
       setNewRoutineName(t(`exercises.${newRoutineType}`));
     }
-  }, [routineToEdit, stepGoal]);
+  }, [routineToEdit]);
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const handleSelectType = (type: any) => {
     setNewRoutineType(type);
-    const typeKeys = ['walking', 'running', 'cycling', 'gym', 'steps', 'other'];
+    const typeKeys = ['walking', 'running', 'cycling', 'gym', 'other'];
     const standardNames = typeKeys.map(k => t(`exercises.${k}`));
     if (!newRoutineName.trim() || standardNames.includes(newRoutineName)) {
       setNewRoutineName(t(`exercises.${type}`));
@@ -1470,8 +1405,7 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
       name: finalName,
       time: newRoutineTime,
       type: newRoutineType,
-      repeat,
-      stepGoal: newRoutineType === 'steps' ? tempStepGoal : undefined
+      repeat
     };
 
     if (routineToEdit) {
@@ -1482,11 +1416,7 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
         completed: false
       });
     }
-    
-    if (newRoutineType === 'steps') {
-      onUpdateStepGoal(tempStepGoal);
-    }
-    
+
     onClose();
   };
 
@@ -1519,13 +1449,12 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
               {['walking', 'running', 'cycling', 'gym', 'other'].map((type) => (
                 <button
                   key={type}
-                  disabled={routineToEdit?.id === 'step-goal-permanent'}
                   onClick={() => handleSelectType(type)}
                   className={`py-3 rounded-2xl text-xs font-bold capitalize transition-all border-2 ${
-                    newRoutineType === type 
-                      ? 'bg-primary/10 border-primary text-primary' 
+                    newRoutineType === type
+                      ? 'bg-primary/10 border-primary text-primary'
                       : 'bg-slate-50 dark:bg-slate-800/50 border-transparent text-slate-500'
-                  } ${routineToEdit?.id === 'step-goal-permanent' && newRoutineType !== type ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  }`}
                 >
                   {t(`exercises.${type}`)}
                 </button>
@@ -1575,46 +1504,21 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
             )}
           </div>
 
-          {/* Step Goal - Only if Steps is selected */}
-          {newRoutineType === 'steps' && (
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-sm uppercase tracking-wider text-slate-400">{t('exercises.stepGoal')}</h4>
-                <span className="text-xl font-black text-primary">{tempStepGoal.toLocaleString()}</span>
-              </div>
-              <input 
-                type="range" 
-                min="1000" 
-                max="30000" 
-                step="500" 
-                value={tempStepGoal} 
-                onChange={(e) => setTempStepGoal(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary"
-              />
-              <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase">
-                <span>1,000</span>
-                <span>30,000</span>
-              </div>
-            </div>
-          )}
-
           {/* Routine Details */}
           <div className="space-y-4">
             <h4 className="font-bold text-sm uppercase tracking-wider text-slate-400 px-1">{t('exercises.routineDetails')}</h4>
-            <input 
-              type="text" 
-              placeholder={t('exercises.routineNamePlaceholder')} 
+            <input
+              type="text"
+              placeholder={t('exercises.routineNamePlaceholder')}
               value={newRoutineName}
-              disabled={routineToEdit?.id === 'step-goal-permanent'}
               onChange={(e) => setNewRoutineName(e.target.value)}
-              className={`w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl py-4 px-5 text-sm font-bold ${routineToEdit?.id === 'step-goal-permanent' ? 'opacity-70 cursor-not-allowed' : ''}`}
+              className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl py-4 px-5 text-sm font-bold"
             />
-            <div className={`flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl py-4 px-5 ${routineToEdit?.id === 'step-goal-permanent' ? 'opacity-70 cursor-not-allowed' : ''}`}>
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl py-4 px-5">
               <Clock className="size-5 text-slate-400" />
-              <input 
-                type="time" 
+              <input
+                type="time"
                 value={newRoutineTime}
-                disabled={routineToEdit?.id === 'step-goal-permanent'}
                 onChange={(e) => setNewRoutineTime(e.target.value)}
                 className="bg-transparent border-none text-sm font-bold flex-1 focus:ring-0"
               />
@@ -1636,15 +1540,13 @@ function RoutineSettingsModal({ onClose, routines, stepGoal, onUpdateStepGoal, o
                       <p className="text-[10px] text-slate-500">{r.time} • {Array.isArray(r.repeat) ? r.repeat.map(d => t(`exercises.${d.toLowerCase()}`)).join(', ') : r.repeat === 'Every day' ? t('exercises.everyDay') : t('exercises.monFri')}</p>
                     </div>
                   </div>
-                  {r.id !== 'step-goal-permanent' && (
-                    <button 
-                      onClick={() => onRemoveRoutine(r.id)}
-                      className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  )}
-                  <button 
+                  <button
+                    onClick={() => onRemoveRoutine(r.id)}
+                    className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                  <button
                     onClick={() => onEditRoutine(r)}
                     className="p-2 text-slate-300 hover:text-primary transition-colors"
                   >
@@ -1687,7 +1589,7 @@ function ActivityTrackingModal({ activity, onClose, onSave }: any) {
       }
 
       // Start Sensor Tracking for Intensity
-      sensorService.startListening(() => {});
+      sensorService.startListening();
 
       timerRef.current = setInterval(() => {
         setElapsed(prev => prev + 1);

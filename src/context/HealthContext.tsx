@@ -42,8 +42,6 @@ interface HealthContextType {
   syncGoogleCalendar: () => Promise<void>;
   logout: () => Promise<void>;
   dismissedNotificationIds: string[];
-  sensorSteps: number;
-  updateSensorSteps: (steps: number) => void;
   selectedDate: string; // YYYY-MM-DD
   setSelectedDate: (date: string) => void;
   clearAllNotifications: () => void;
@@ -240,7 +238,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       email: '',
       avatar: null,
       onboardingCompleted: false,
-      stepGoal: 8000,
       workActivityType: 'Sedentary',
       sleepQuality: 'Good',
       units: 'metric',
@@ -297,27 +294,9 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [routines, setRoutines] = useState<ExerciseRoutine[]>(() => {
-    const saved = safeLocalStorage.getItem('health_routines');
-    const defaultRoutines: ExerciseRoutine[] = [
-      { id: 'step-goal-permanent', name: 'Step Goal', time: 'All Day', completed: false, type: 'steps', repeat: 'Every day' },
-    ];
-    if (!saved) return defaultRoutines;
-    let parsed: ExerciseRoutine[] = [];
-    try {
-      parsed = JSON.parse(saved);
-    } catch {
-      return defaultRoutines;
-    }
-    
-    // Migration: Ensure permanent step goal exists
-    if (!parsed.some((r: any) => r.id === 'step-goal-permanent')) {
-      parsed = [defaultRoutines[0], ...parsed];
-    }
-    
-    return parsed;
+    return safeLocalStorage.getParsed<ExerciseRoutine[]>('health_routines', []);
   });
 
-  const [sensorSteps, setSensorSteps] = useState(sensorService.getSteps());
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
 
   const openPermissionsModal = () => setIsPermissionsModalOpen(true);
@@ -332,33 +311,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, []);
-
-  const updateSensorSteps = (newSteps: number) => {
-    sensorService.setSteps(newSteps);
-    setSensorSteps(newSteps);
-  };
-
-  useEffect(() => {
-    sensorService.startListening((steps) => {
-      setSensorSteps(steps);
-    });
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        const current = sensorService.getSteps();
-        setSensorSteps(current);
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
-
-    return () => {
-      sensorService.stopListening();
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
-    };
   }, []);
 
   const requestSensorPermission = async () => {
@@ -563,7 +515,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Total GASTO Target = Base + Atividade + Rotinas + Exercícios + Gym + Ajuste de Meta
-    // Note: Exercise, routine and gym calories are calculated as NET calories. Steps burned are tracked under burned_calories.
     return baseTDEE + routineBurned + exerciseBurned + gymBurned + goalAdjustment;
   }, [profile, activities, routines, gymLogs, goals, historyRecords, calculateBMR, selectedDate]);
 
@@ -617,16 +568,8 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       const gymBurned = gymLogs
         .filter(g => new Date(g.date).toDateString() === today)
         .reduce((sum, g) => sum + (g.caloriesBurned || 0), 0);
-      
-      const stepsToday = today === new Date().toDateString() 
-        ? sensorSteps 
-        : records
-            .filter(r => r.metric === 'steps' && new Date(r.date).toDateString() === today)
-            .reduce((sum, r) => sum + r.value, 0);
-      // Updates 4 kcal for every 100 steps performed
-      const stepsBurned = Math.floor(stepsToday / 100) * 4;
-          
-      return routineBurned + activityBurned + gymBurned + stepsBurned;
+
+      return routineBurned + activityBurned + gymBurned;
     }
 
     if (metric === 'net_calories') {
@@ -649,37 +592,22 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
         .reduce((sum, w) => sum + w.amount, 0) / 1000; // Convert ml to L
     }
 
-    if (metric === 'steps') {
-      // If it's today, return sensor steps, otherwise return recorded steps
-      if (today === new Date().toDateString()) {
-        return sensorSteps;
-      }
-      return records
-        .filter(r => r.metric === 'steps' && new Date(r.date).toDateString() === today)
-        .reduce((sum, r) => sum + r.value, 0);
-    }
-
     if (metric === 'healthScore') {
-      // 1. Steps Score (20%)
-      const stepGoal = profile.stepGoal || 10000;
-      const steps = getTodayValue('steps');
-      const stepScore = Math.min(100, (steps / stepGoal) * 100);
-
-      // 2. Hydration Score (15%)
+      // 1. Hydration Score (20%)
       const waterTarget = getDailyWaterTarget();
       const water = waterLogs
         .filter(w => new Date(w.date).toDateString() === today)
         .reduce((sum, w) => sum + w.amount, 0) / 1000;
       const waterScore = Math.min(100, (water / waterTarget) * 100);
 
-      // 3. Nutrition Score (20%)
+      // 2. Nutrition Score (25%)
       const calorieTarget = getDailyCalorieTarget();
       const consumed = meals
         .filter(m => new Date(m.date).toDateString() === today)
         .reduce((sum, m) => sum + m.calories, 0);
       const calorieScore = consumed > 0 ? Math.max(0, 100 - Math.min(100, Math.abs((consumed - calorieTarget) / calorieTarget) * 100)) : 50;
 
-      // 4. Exercise Score (20%)
+      // 3. Exercise Score (25%)
       // Based on completed routines today
       const todayWeekday = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
       const routinesForDate = routines.filter(r => {
@@ -694,20 +622,19 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       const totalRoutines = routinesForDate.length;
       const exerciseScore = totalRoutines > 0 ? (completedRoutines / totalRoutines) * 100 : 70;
 
-      // 5. Mental Health Score (15%)
-      
-      // 6. Medical Risk Factor (10%)
+      // 4. Mental Health Score (20%)
+
+      // 5. Medical Risk Factor (10%)
       const activeConditions = historyRecords.filter(r => r.category === 'Medical History' && (r as any).status === 'Active').length;
       const criticalExams = historyRecords.filter(r => r.category === 'Exams' && (r as any).status === 'Attention Required').length;
       const medicalScore = Math.max(0, 100 - (activeConditions * 10) - (criticalExams * 5));
 
       // Weighted average
-      const totalScore = 
-        (stepScore * 0.20) + 
-        (waterScore * 0.15) + 
-        (calorieScore * 0.20) + 
-        (exerciseScore * 0.20) + 
-        (mentalHealthScore * 0.15) +
+      const totalScore =
+        (waterScore * 0.20) +
+        (calorieScore * 0.25) +
+        (exerciseScore * 0.25) +
+        (mentalHealthScore * 0.20) +
         (medicalScore * 0.10);
 
       return Math.round(totalScore);
@@ -716,7 +643,7 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
     return records
       .filter(r => r.metric === metric && new Date(r.date).toDateString() === today)
       .reduce((sum, r) => sum + r.value, 0);
-  }, [meals, activities, gymLogs, waterLogs, sensorSteps, profile, records, routines, historyRecords, mentalHealthScore, getDailyWaterTarget, getDailyCalorieTarget, selectedDate]);
+  }, [meals, activities, gymLogs, waterLogs, profile, records, routines, historyRecords, mentalHealthScore, getDailyWaterTarget, getDailyCalorieTarget, selectedDate]);
 
   const [isDayEnded, setIsDayEnded] = useState<boolean>(() => {
     const saved = safeLocalStorage.getItem('health_day_ended');
@@ -1256,8 +1183,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
   };
 
   function deleteRoutine(id: string) {
-    if (id === 'step-goal-permanent') return; // Cannot delete permanent step goal
-    
     setRoutines(prev => {
       const routine = prev.find(r => r.id === id);
       if (!routine) return prev;
@@ -1625,10 +1550,8 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       return sum + ((a.duration || 0) / 60) * multiplier;
     }, 0);
     
-    const currentSteps = isToday ? sensorSteps : (records.find(r => r.metric === 'steps' && new Date(r.date).toDateString() === targetDateStr)?.value || 0);
-    const rawStepsScore = (currentSteps / 10000) * 40;
-    const rawCardioScore = (cardioEquivMinutes / 60) * 60;
-    const conditioningScore = Math.min(100, ((rawStepsScore + rawCardioScore) / (windowTargetPercent || 1)));
+    const rawCardioScore = (cardioEquivMinutes / 60) * 100;
+    const conditioningScore = Math.min(100, (rawCardioScore / (windowTargetPercent || 1)));
 
     const radarData: RadarChartAxes = {
       strength: Math.round(strengthScore),
@@ -1656,7 +1579,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       - Calories: ${consumed}kcal (Total Goal: ${calorieTarget.toFixed(0)}kcal)
       - Protein: ${proteinConsumed}g (Total Goal: ${proteinTarget.toFixed(0)}g)
       - Hydration: ${water.toFixed(1)}L (Total Goal: ${waterTarget.toFixed(1)}L)
-      - Steps: ${currentSteps} (Goal: 10000)
       - Cardio: ${cardioEquivMinutes.toFixed(1)} mins (Goal: 60)
       
       Radar Axes (Relative to Current Rhythm): ${JSON.stringify(radarData)}
@@ -1680,7 +1602,7 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
           - Vitality: If low, cross-reference with Medical History, Active Medications, and Today's Vitals.
             * If BP is high or Glucose is off, highlight how this "drains" vitality.
             * If a medication was recently stopped, analyze the impact on health goals (e.g., "Você parou com o medicamento X, monitore sua disposição nos treinos").
-          - Conditioning: If low, mention steps or cardio activity.
+          - Conditioning: If low, mention lack of cardio activity.
       5. BIO-INTEGRAÇÃO: Analise como os medicamentos ativos e vitais impactam a performance (ex: recuperação muscular, hidratação, foco). Se um vital estiver alterado, sugira ajustes imediatos.
       6. INSTRUÇÕES DE IDIOMA (OMNI-V42):
           - Responda inteiramente no idioma: ${appLanguage}.
@@ -1905,7 +1827,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
         totalExerciseCalories,
         totalDailyExpenditure,
         bmr: calculateBMR(),
-        stepGoal: profile.stepGoal,
         units: profile.units
       },
       dataCounts: {
@@ -2011,8 +1932,6 @@ export function HealthProvider({ children }: { children: React.ReactNode }) {
       syncGoogleCalendar,
       logout,
       dismissedNotificationIds,
-      sensorSteps,
-      updateSensorSteps,
       selectedDate,
       setSelectedDate,
       exportData,

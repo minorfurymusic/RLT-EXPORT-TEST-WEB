@@ -141,7 +141,6 @@ export interface DomainParsedPlan {
   heightProfile?: number;
   ageProfile?: number;
   goalProfile?: string;
-  stepGoalProfile?: number;
 }
 
 function normalizeText(text: string): string {
@@ -366,8 +365,6 @@ export function segmentIntentionClauses(rawQuery: string): IntentionSegment[] {
     } else if (/\b(medicamento|remedio|remédio|vitamina|dipirona|amoxicilina|creatina|tomando|tomei|tomo|tomar)\b/.test(cNorm) && !cNorm.includes('exame de vitamina')) {
       domain = 'MEDS';
     } else if ((/\b(peso|altura|idade|anos)\b/.test(cNorm) && (cNorm.includes('meu') || cNorm.includes('minha') || cNorm.includes('corrija') || cNorm.includes('corrige') || cNorm.includes('tenho') || cNorm.includes('kg') || cNorm.includes('cm')))) {
-      domain = 'PROFILE';
-    } else if (/\bpassos?\b/.test(cNorm) && /\b(meta|objetivo|aument|diminu|defin|mude|mudar|altere|alterar|quero|coloque|coloca)\b/.test(cNorm)) {
       domain = 'PROFILE';
     } else if (/\btema\b/.test(cNorm) && /\b(troc|mud|altern)/.test(cNorm)) {
       domain = 'THEME';
@@ -837,8 +834,6 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
     const heightMatch = cNorm.match(/(\d+)\s*cm/);
     // "corrige minha idade pra 33", "tenho 32 anos" — either wording for age
     const ageMatch = cNorm.match(/(?:idade\D{0,10}|tenho\s+)(\d{1,3})\s*(?:anos)?\b/) || cNorm.match(/(\d{1,3})\s*anos\b/);
-    // "meta de passos para 10000", "quero caminhar 8000 passos por dia", "aumente meus passos para 12000"
-    const stepGoalMatch = cNorm.match(/(\d{3,6})\s*passos/) || cNorm.match(/passos\D{0,15}(\d{3,6})/);
 
     // Extract goal change
     let goalProfile: string | undefined;
@@ -875,8 +870,7 @@ export function parseAndValidateDomain(segment: IntentionSegment): DomainParsedP
       weightProfile: weightMatch ? parseFloat(weightMatch[1]) : undefined,
       heightProfile: heightMatch ? parseInt(heightMatch[1], 10) : undefined,
       ageProfile: ageMatch ? parseInt(ageMatch[1], 10) : undefined,
-      goalProfile,
-      stepGoalProfile: stepGoalMatch ? parseInt(stepGoalMatch[1], 10) : undefined
+      goalProfile
     };
   }
 
@@ -1189,12 +1183,6 @@ export function classifyAndExecuteQuery(
         isMutation = true;
         actionsTaken.push('updateProfileGoal');
         logMessages.push(`🎯 **Perfil:** ✔ Objetivo atualizado para **${plan.goalProfile}** na Base Central`);
-      }
-      if (plan.stepGoalProfile) {
-        ctx.updateProfile({ stepGoal: plan.stepGoalProfile });
-        isMutation = true;
-        actionsTaken.push('updateProfileStepGoal');
-        logMessages.push(`👣 **Perfil:** ✔ Meta de passos atualizada para **${plan.stepGoalProfile}** na Base Central`);
       }
       continue;
     }

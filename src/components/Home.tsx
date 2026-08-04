@@ -2,9 +2,8 @@ import {
   Bell, 
   Beef, 
   FitnessCenter, 
-  Droplets, 
-  Footprints, 
-  Medication, 
+  Droplets,
+  Medication,
   Calendar, 
   Walk, 
   Lightbulb, 
@@ -74,7 +73,6 @@ export default function Home() {
   const targetIsoDate = selectedDate;
   const targetWeekday = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
 
-  const todaySteps = getTodayValue('steps');
   const todayCalories = meals.filter(m => new Date(m.date).toDateString() === targetDateStr)
     .reduce((sum, m) => sum + m.calories, 0);
   const dailyCalorieTarget = getDailyCalorieTarget();
@@ -92,10 +90,8 @@ export default function Home() {
     let score = 0;
     
     // 1. Exercise (25 points)
-    const stepProgress = Math.min(1, todaySteps / profile.stepGoal);
-    score += stepProgress * 15;
     const completedRoutines = activeRoutines.filter(r => r.completed).length;
-    score += (completedRoutines / Math.max(1, activeRoutines.length)) * 10;
+    score += (completedRoutines / Math.max(1, activeRoutines.length)) * 25;
 
     // 2. Nutrition (25 points)
     const calorieDiff = Math.abs(todayCalories - dailyCalorieTarget);
@@ -119,7 +115,6 @@ export default function Home() {
   const calories = getTodayValue('calories');
   const protein = getTodayValue('protein');
   const water = getTodayValue('hydration');
-  const steps = getTodayValue('steps');
 
   const isProfileIncomplete = !profile.sex || !profile.age || !profile.height;
 
@@ -143,12 +138,10 @@ export default function Home() {
   );
   const isProteinGoalMet = isDayEnded && protein >= proteinTarget;
   const isWaterGoalMet = isDayEnded && water >= waterTarget;
-  const isStepsGoalMet = isDayEnded && steps >= profile.stepGoal;
 
   const isCalorieMissed = isDayEnded && !isCalorieGoalMet;
   const isProteinMissed = isDayEnded && !isProteinGoalMet;
   const isWaterMissed = isDayEnded && !isWaterGoalMet;
-  const isStepsMissed = isDayEnded && !isStepsGoalMet;
 
   const handleCheckInStart = () => {
     setView('mental');
@@ -446,17 +439,6 @@ export default function Home() {
               color="bg-cyan-500" 
               isCompleted={isWaterGoalMet}
               isMissed={isWaterMissed}
-            />
-            <GoalItem 
-              onClick={() => navigate('/metric/steps')}
-              icon={<Footprints className="size-4 text-emerald-500" />} 
-              label={t('common.steps')} 
-              current={steps} 
-              target={profile.stepGoal} 
-              unit="" 
-              color="bg-emerald-500" 
-              isCompleted={isStepsGoalMet}
-              isMissed={isStepsMissed}
             />
           </div>
         </div>

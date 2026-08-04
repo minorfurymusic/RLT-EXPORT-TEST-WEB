@@ -99,9 +99,8 @@ export const gymTool: BrainTool = {
     date: z.string().optional(),
     name: z.string().optional(),
     time: z.string().optional(),
-    routineType: z.enum(['walking', 'running', 'cycling', 'gym', 'steps', 'other']).optional(),
+    routineType: z.enum(['walking', 'running', 'cycling', 'gym', 'other']).optional(),
     repeat: z.union([z.string(), z.array(z.string())]).optional(),
-    stepGoal: z.number().optional(),
     completed: z.boolean().optional(),
     needsClarification: z.boolean().optional(),
     clarificationQuestion: z.string().optional()
@@ -327,7 +326,6 @@ export const profileTool: BrainTool = {
     weight: z.number().positive().optional(),
     height: z.number().positive().optional(),
     sex: z.enum(['Male', 'Female', 'Other']).optional(),
-    stepGoal: z.number().positive().optional(),
     units: z.enum(['metric', 'imperial']).optional(),
     goal: z.enum(['Muscle Gain', 'Weight Loss', 'Maintenance', 'Health']).optional(),
     foodRestrictions: z.string().optional(),

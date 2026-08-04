@@ -1,25 +1,25 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Share2, Download, Check, Sparkles, Trophy, Flame, Droplet, Activity } from 'lucide-react';
+import { X, Share2, Download, Check, Sparkles, Trophy, Droplet } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useHealth } from '../context/HealthContext';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultCategory?: 'biostatus' | 'water' | 'nutrition' | 'activity';
+  defaultCategory?: 'biostatus' | 'water' | 'nutrition';
 }
 
 export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostatus' }: ShareModalProps) {
   const { profile, waterLogs, meals, historyRecords, t, appLanguage } = useHealth();
-  const [activeCategory, setActiveCategory] = useState<'biostatus' | 'water' | 'nutrition' | 'activity'>(defaultCategory);
+  const [activeCategory, setActiveCategory] = useState<'biostatus' | 'water' | 'nutrition'>(defaultCategory);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Compute daily metrics for share card
   const todayStr = new Date().toISOString().split('T')[0];
-  
+
   const todayWaterMl = waterLogs
     .filter(w => w.date === todayStr)
     .reduce((acc, curr) => acc + curr.amount, 0);
@@ -28,10 +28,6 @@ export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostat
 
   const todayMeals = meals.filter(m => m.date === todayStr);
   const todayCalories = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
-
-  const todaySteps = profile.todaySteps || 6420;
-  const stepTarget = profile.stepGoal || 10000;
-  const stepPct = Math.min(100, Math.round((todaySteps / stepTarget) * 100));
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
@@ -56,12 +52,10 @@ export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostat
 
   const handleNativeShare = async () => {
     const textContent = activeCategory === 'biostatus'
-      ? `⚡ Meu Bio-Status no Real Life Track!\n🏆 Score Circadiano: 88/100\n💧 Hidratação: ${todayWaterMl}ml (${waterPct}%)\n🏃 Passos: ${todaySteps.toLocaleString('pt-BR')} (${stepPct}%)\n\n#RealLifeTrack #Saude`
+      ? `⚡ Meu Bio-Status no Real Life Track!\n🏆 Score Circadiano: 88/100\n💧 Hidratação: ${todayWaterMl}ml (${waterPct}%)\n\n#RealLifeTrack #Saude`
       : activeCategory === 'water'
       ? `💧 Meta de Hidratação Concluída no Real Life Track!\nBebei ${todayWaterMl}ml de água hoje (${waterPct}% da meta).\n\n#RealLifeTrack #Hidratação`
-      : activeCategory === 'nutrition'
-      ? `🥗 Balanço Nutricional de Hoje no Real Life Track:\n${todayCalories} kcal consumidas em ${todayMeals.length} refeições.\n\n#RealLifeTrack #Nutricao`
-      : `🏃 Meu Treino e Passos no Real Life Track:\n${todaySteps.toLocaleString('pt-BR')} passos registrados hoje (${stepPct}% da meta).\n\n#RealLifeTrack #Fitness`;
+      : `🥗 Balanço Nutricional de Hoje no Real Life Track:\n${todayCalories} kcal consumidas em ${todayMeals.length} refeições.\n\n#RealLifeTrack #Nutricao`;
 
     const shareData = {
       title: 'Real Life Track - Compartilhar Progresso',
@@ -137,14 +131,6 @@ export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostat
               >
                 🥗 Nutrição
               </button>
-              <button
-                onClick={() => setActiveCategory('activity')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  activeCategory === 'activity' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                🏃 Atividade
-              </button>
             </div>
 
             {/* Visual Social Story Card (Rendered for Screenshot) */}
@@ -181,24 +167,13 @@ export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostat
                     <Trophy className="size-8 text-amber-400 animate-pulse" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-blue-400 text-[10px] font-bold mb-1">
-                        <Droplet className="size-3.5" />
-                        <span>Água Hoje</span>
-                      </div>
-                      <p className="text-lg font-black text-white">{todayWaterMl} <span className="text-xs text-slate-400">ml</span></p>
-                      <p className="text-[10px] text-blue-300">{waterPct}% da meta</p>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+                    <div className="flex items-center gap-1.5 text-blue-400 text-[10px] font-bold mb-1">
+                      <Droplet className="size-3.5" />
+                      <span>Água Hoje</span>
                     </div>
-
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                      <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-bold mb-1">
-                        <Flame className="size-3.5" />
-                        <span>Passos</span>
-                      </div>
-                      <p className="text-lg font-black text-white">{todaySteps.toLocaleString('pt-BR')}</p>
-                      <p className="text-[10px] text-amber-300">{stepPct}% da meta</p>
-                    </div>
+                    <p className="text-lg font-black text-white">{todayWaterMl} <span className="text-xs text-slate-400">ml</span></p>
+                    <p className="text-[10px] text-blue-300">{waterPct}% da meta</p>
                   </div>
                 </div>
               )}
@@ -228,18 +203,6 @@ export default function ShareModal({ isOpen, onClose, defaultCategory = 'biostat
                     <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-full">
                       {todayMeals.length} refeições
                     </span>
-                  </div>
-                </div>
-              )}
-
-              {activeCategory === 'activity' && (
-                <div className="py-2 space-y-3 relative z-10">
-                  <div className="flex items-center justify-between bg-amber-500/10 p-3.5 rounded-2xl border border-amber-500/20">
-                    <div>
-                      <p className="text-[10px] font-bold text-amber-400 uppercase">Passos Registrados</p>
-                      <p className="text-2xl font-black text-white">{todaySteps.toLocaleString('pt-BR')}</p>
-                    </div>
-                    <Activity className="size-7 text-amber-400" />
                   </div>
                 </div>
               )}

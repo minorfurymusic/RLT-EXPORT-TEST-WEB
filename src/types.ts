@@ -34,7 +34,6 @@ export interface UserProfile {
   weight?: number;
   height?: number;
   sex?: 'Male' | 'Female' | 'Other';
-  stepGoal: number;
   // Personal Information
   ethnicity?: string;
   address?: string;
@@ -56,7 +55,6 @@ export interface UserProfile {
   language?: string;
   selectedConditions?: SelectedCondition[];
   customWaterGoal?: number;
-  todaySteps?: number;
 }
 
 export interface RadarChartAxes {
@@ -116,7 +114,7 @@ export interface HealthGoal {
 
 export interface HealthRecord {
   id: string;
-  metric: 'calories' | 'protein' | 'hydration' | 'steps' | 'healthScore' | 'burned_calories' | 'net_calories';
+  metric: 'calories' | 'protein' | 'hydration' | 'healthScore' | 'burned_calories' | 'net_calories';
   value: number;
   date: string; // ISO string
 }
@@ -410,9 +408,8 @@ export interface ExerciseRoutine {
   name: string;
   time: string;
   completed: boolean;
-  type: 'walking' | 'running' | 'cycling' | 'gym' | 'steps' | 'other';
+  type: 'walking' | 'running' | 'cycling' | 'gym' | 'other';
   repeat: 'Every day' | 'Monday-Friday' | string[];
-  stepGoal?: number;
   // Manual tracking fields
   distance?: number; // km
   duration?: number; // minutes

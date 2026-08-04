@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHealth } from '../context/HealthContext';
-import { Beef, Droplets, Footprints, Stethoscope, Plus, Trash2, Edit3, ChevronRight, X, Dumbbell, Flame } from './Icons';
+import { Beef, Droplets, Stethoscope, Plus, Trash2, Edit3, ChevronRight, X, Dumbbell, Flame } from './Icons';
 import { cn } from '../lib/utils';
 
 const METRIC_CONFIG = {
   calories: { title: 'Calories', unit: 'kcal', target: 2500, icon: <Flame className="size-6" />, color: 'bg-orange-500', textColor: 'text-orange-500' },
   protein: { title: 'Protein', unit: 'g', target: 120, icon: <Beef className="size-6" />, color: 'bg-blue-500', textColor: 'text-blue-500' },
   hydration: { title: 'Hydration', unit: 'L', target: 3, icon: <Droplets className="size-6" />, color: 'bg-cyan-500', textColor: 'text-cyan-500' },
-  steps: { title: 'Steps', unit: '', target: 10000, icon: <Footprints className="size-6" />, color: 'bg-emerald-500', textColor: 'text-emerald-500' },
   healthScore: { title: 'Health Score', unit: '/100', target: 100, icon: <Stethoscope className="size-6" />, color: 'bg-primary', textColor: 'text-primary' },
 };
 
@@ -116,7 +115,7 @@ export default function MetricDetail() {
       </section>
 
       {/* FAB */}
-      {metricType !== 'healthScore' && metricType !== 'steps' && (
+      {metricType !== 'healthScore' && (
         <button 
           onClick={() => setIsModalOpen(true)}
           className={cn("fixed right-6 bottom-24 size-14 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform z-30", config.color)}
