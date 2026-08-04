@@ -27,6 +27,7 @@ class SensorService {
   private audioCtx: AudioContext | null = null;
   private keepAliveInterval: any = null;
   private isKeepAliveActive: boolean = false;
+  private nativeSyncInterval: any = null;
 
   constructor() {
     this.checkAndResetDaily();
@@ -246,6 +247,13 @@ class SensorService {
       StepTracker.startTracking().catch(e => console.warn('StepTracker.startTracking failed:', e));
       void this.syncFromNativeSources();
 
+      // Health Connect / the native service aren't pushed to us — without this,
+      // the count only ever refreshes when the app is backgrounded and resumed,
+      // which looks broken if you just sit on a screen watching the number.
+      if (!this.nativeSyncInterval) {
+        this.nativeSyncInterval = setInterval(() => void this.syncFromNativeSources(), 30000);
+      }
+
       try {
         this.motionListenerHandle = await Motion.addListener('accel', (event) => {
           this.processAcceleration(event.acceleration, event.accelerationIncludingGravity);
@@ -261,6 +269,10 @@ class SensorService {
 
   public async stopListening() {
     this.isListening = false;
+    if (this.nativeSyncInterval) {
+      clearInterval(this.nativeSyncInterval);
+      this.nativeSyncInterval = null;
+    }
     if (this.motionListenerHandle) {
       try {
         await this.motionListenerHandle.remove();
