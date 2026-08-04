@@ -97,30 +97,60 @@ class SensorService {
    */
   public async syncFromNativeSources(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
+    const debug = await this.getDebugStepSources();
 
     let best = this.steps;
-
-    try {
-      const { steps } = await StepTracker.getSteps();
-      if (steps > best) best = steps;
-    } catch (e) {
-      console.warn('Native step service unavailable:', e);
-    }
-
-    try {
-      const { available } = await StepTracker.isHealthConnectAvailable();
-      if (available) {
-        const { steps } = await StepTracker.getHealthConnectSteps();
-        if (steps > best) best = steps;
-      }
-    } catch (e) {
-      // Expected when Health Connect isn't installed or permission wasn't granted yet.
-      console.warn('Health Connect steps unavailable:', e);
-    }
+    if (debug.service !== null && debug.service > best) best = debug.service;
+    if (debug.healthConnect !== null && debug.healthConnect > best) best = debug.healthConnect;
 
     if (best > this.steps) {
       this.setSteps(best);
     }
+  }
+
+  /**
+   * Raw per-source readout, with the actual error message when a source
+   * fails, instead of collapsing everything into a single number silently.
+   * Surfaced in the UI (Exercises.tsx step-goal card) so a real failure can
+   * be diagnosed by reading the screen instead of needing device logs.
+   */
+  public async getDebugStepSources(): Promise<{
+    service: number | null;
+    serviceError?: string;
+    healthConnect: number | null;
+    healthConnectError?: string;
+  }> {
+    const result: { service: number | null; serviceError?: string; healthConnect: number | null; healthConnectError?: string } = {
+      service: null,
+      healthConnect: null,
+    };
+
+    if (!Capacitor.isNativePlatform()) {
+      result.serviceError = 'not native platform';
+      result.healthConnectError = 'not native platform';
+      return result;
+    }
+
+    try {
+      const { steps } = await StepTracker.getSteps();
+      result.service = steps;
+    } catch (e: any) {
+      result.serviceError = e?.message || String(e);
+    }
+
+    try {
+      const { available, status } = await StepTracker.isHealthConnectAvailable();
+      if (!available) {
+        result.healthConnectError = `status: ${status}`;
+      } else {
+        const { steps } = await StepTracker.getHealthConnectSteps();
+        result.healthConnect = steps;
+      }
+    } catch (e: any) {
+      result.healthConnectError = e?.message || String(e);
+    }
+
+    return result;
   }
 
   /** Prompts the user for Health Connect read access (Opção B) — safe to call repeatedly. */

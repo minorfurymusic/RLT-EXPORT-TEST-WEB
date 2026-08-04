@@ -101,6 +101,17 @@ export default function Exercises() {
   const stepGoalAchieved = todaySteps >= profile.stepGoal;
 
   const [healthConnectStatus, setHealthConnectStatus] = useState<'idle' | 'connecting' | 'connected' | 'not_installed' | 'not_supported'>('idle');
+  const [stepDebug, setStepDebug] = useState<{ service: number | null; serviceError?: string; healthConnect: number | null; healthConnectError?: string } | null>(null);
+
+  const refreshStepDebug = () => {
+    sensorService.getDebugStepSources().then(setStepDebug);
+  };
+
+  useEffect(() => {
+    refreshStepDebug();
+    const interval = setInterval(refreshStepDebug, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleConnectHealthConnect = async () => {
     setHealthConnectStatus('connecting');
@@ -112,6 +123,7 @@ export default function Exercises() {
     } else {
       setHealthConnectStatus('not_supported');
     }
+    refreshStepDebug();
   };
 
   const handleRequestPermission = async () => {
@@ -360,11 +372,18 @@ export default function Exercises() {
                     </div>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, (todaySteps / profile.stepGoal) * 100)}%` }}
                     ></div>
                   </div>
+                  {stepDebug && (
+                    <div className="mt-2 text-[9px] text-slate-400 font-mono leading-relaxed">
+                      {appLanguage === 'pt-BR' ? 'Serviço próprio' : 'Own service'}: {stepDebug.service ?? `erro: ${stepDebug.serviceError}`}
+                      {' · '}
+                      Health Connect: {stepDebug.healthConnect ?? `erro: ${stepDebug.healthConnectError}`}
+                    </div>
+                  )}
                 </div>
 
                 {/* Scheduled Routines for Today */}
