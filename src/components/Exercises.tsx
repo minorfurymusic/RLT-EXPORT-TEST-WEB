@@ -100,32 +100,6 @@ export default function Exercises() {
   const todaySteps = sensorSteps;
   const stepGoalAchieved = todaySteps >= profile.stepGoal;
 
-  const [healthConnectStatus, setHealthConnectStatus] = useState<'idle' | 'connecting' | 'connected' | 'not_installed' | 'not_supported'>('idle');
-  const [stepDebug, setStepDebug] = useState<{ service: number | null; serviceError?: string; healthConnect: number | null; healthConnectError?: string } | null>(null);
-
-  const refreshStepDebug = () => {
-    sensorService.getDebugStepSources().then(setStepDebug);
-  };
-
-  useEffect(() => {
-    refreshStepDebug();
-    const interval = setInterval(refreshStepDebug, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleConnectHealthConnect = async () => {
-    setHealthConnectStatus('connecting');
-    const { granted, status } = await sensorService.requestHealthConnectPermission();
-    if (granted) {
-      setHealthConnectStatus('connected');
-    } else if (status === 'not_installed') {
-      setHealthConnectStatus('not_installed');
-    } else {
-      setHealthConnectStatus('not_supported');
-    }
-    refreshStepDebug();
-  };
-
   const handleRequestPermission = async () => {
     const granted = await requestSensorPermission();
     if (granted) {
@@ -320,32 +294,6 @@ export default function Exercises() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {healthConnectStatus === 'not_installed' ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sensorService.openHealthConnectInstallPage();
-                          }}
-                          className="text-[10px] font-extrabold text-amber-600 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-2.5 py-1 rounded-full transition-colors"
-                        >
-                          {appLanguage === 'pt-BR' ? 'Instalar Health Connect' : 'Install Health Connect'}
-                        </button>
-                      ) : healthConnectStatus !== 'connected' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConnectHealthConnect();
-                          }}
-                          disabled={healthConnectStatus === 'connecting'}
-                          className="text-[10px] font-extrabold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50"
-                        >
-                          {healthConnectStatus === 'connecting'
-                            ? (appLanguage === 'pt-BR' ? 'Conectando...' : 'Connecting...')
-                            : healthConnectStatus === 'not_supported'
-                            ? (appLanguage === 'pt-BR' ? 'Health Connect indisponível' : 'Health Connect unavailable')
-                            : (appLanguage === 'pt-BR' ? 'Conectar Health Connect' : 'Connect Health Connect')}
-                        </button>
-                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -377,13 +325,6 @@ export default function Exercises() {
                       style={{ width: `${Math.min(100, (todaySteps / profile.stepGoal) * 100)}%` }}
                     ></div>
                   </div>
-                  {stepDebug && (
-                    <div className="mt-2 text-[9px] text-slate-400 font-mono leading-relaxed">
-                      {appLanguage === 'pt-BR' ? 'Serviço próprio' : 'Own service'}: {stepDebug.service ?? `erro: ${stepDebug.serviceError}`}
-                      {' · '}
-                      Health Connect: {stepDebug.healthConnect ?? `erro: ${stepDebug.healthConnectError}`}
-                    </div>
-                  )}
                 </div>
 
                 {/* Scheduled Routines for Today */}

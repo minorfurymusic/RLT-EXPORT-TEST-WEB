@@ -4,7 +4,6 @@ import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { safeLocalStorage } from '../lib/utils';
-import { StepTracker, HealthConnectStatus } from './nativeStepBridge';
 
 export interface StepSensorData {
   steps: number;
@@ -27,7 +26,6 @@ class SensorService {
   private audioCtx: AudioContext | null = null;
   private keepAliveInterval: any = null;
   private isKeepAliveActive: boolean = false;
-  private nativeSyncInterval: any = null;
 
   constructor() {
     this.checkAndResetDaily();
@@ -77,104 +75,6 @@ class SensorService {
     // If app was closed/backgrounded, sync latest step state to listeners
     if (this.onStepCallback) {
       this.onStepCallback(this.steps);
-    }
-
-    // Fire-and-forget: pull whatever the native side counted while this JS
-    // context wasn't running at all (app killed, not just backgrounded) —
-    // the JS-side accelerometer listener above can't see that gap, only the
-    // native foreground service (Opção A) and Health Connect (Opção B) can.
-    void this.syncFromNativeSources();
-  }
-
-  /**
-   * Reconciles the JS-tracked step count against the two native Android
-   * sources. Both are best-effort and independent: if Health Connect isn't
-   * installed/authorized, its call simply fails and is ignored; if the
-   * native foreground service hasn't produced a sensor event yet today, it
-   * just returns 0. Whichever source reports the highest count for today
-   * wins — "se um não funcionar, puxa o outro" — since undercounting from a
-   * quiet/unavailable source is far more likely than any source overcounting.
-   */
-  public async syncFromNativeSources(): Promise<void> {
-    if (!Capacitor.isNativePlatform()) return;
-    const debug = await this.getDebugStepSources();
-
-    let best = this.steps;
-    if (debug.service !== null && debug.service > best) best = debug.service;
-    if (debug.healthConnect !== null && debug.healthConnect > best) best = debug.healthConnect;
-
-    if (best > this.steps) {
-      this.setSteps(best);
-    }
-  }
-
-  /**
-   * Raw per-source readout, with the actual error message when a source
-   * fails, instead of collapsing everything into a single number silently.
-   * Surfaced in the UI (Exercises.tsx step-goal card) so a real failure can
-   * be diagnosed by reading the screen instead of needing device logs.
-   */
-  public async getDebugStepSources(): Promise<{
-    service: number | null;
-    serviceError?: string;
-    healthConnect: number | null;
-    healthConnectError?: string;
-  }> {
-    const result: { service: number | null; serviceError?: string; healthConnect: number | null; healthConnectError?: string } = {
-      service: null,
-      healthConnect: null,
-    };
-
-    if (!Capacitor.isNativePlatform()) {
-      result.serviceError = 'not native platform';
-      result.healthConnectError = 'not native platform';
-      return result;
-    }
-
-    try {
-      const { steps } = await StepTracker.getSteps();
-      result.service = steps;
-    } catch (e: any) {
-      result.serviceError = e?.message || String(e);
-    }
-
-    try {
-      const { available, status } = await StepTracker.isHealthConnectAvailable();
-      if (!available) {
-        result.healthConnectError = `status: ${status}`;
-      } else {
-        const { steps } = await StepTracker.getHealthConnectSteps();
-        result.healthConnect = steps;
-      }
-    } catch (e: any) {
-      result.healthConnectError = e?.message || String(e);
-    }
-
-    return result;
-  }
-
-  /** Prompts the user for Health Connect read access (Opção B) — safe to call repeatedly. */
-  public async requestHealthConnectPermission(): Promise<{ granted: boolean; status: HealthConnectStatus }> {
-    if (!Capacitor.isNativePlatform()) return { granted: false, status: 'not_supported' };
-    try {
-      const { status } = await StepTracker.isHealthConnectAvailable();
-      if (status !== 'available') return { granted: false, status };
-      const { granted } = await StepTracker.requestHealthConnectPermission();
-      if (granted) void this.syncFromNativeSources();
-      return { granted, status: 'available' };
-    } catch (e) {
-      console.warn('Health Connect permission request failed:', e);
-      return { granted: false, status: 'not_supported' };
-    }
-  }
-
-  /** Opens the Play Store listing for Health Connect (only meaningful when status is 'not_installed'). */
-  public async openHealthConnectInstallPage(): Promise<void> {
-    if (!Capacitor.isNativePlatform()) return;
-    try {
-      await StepTracker.openHealthConnectInstallPage();
-    } catch (e) {
-      console.warn('Could not open Health Connect install page:', e);
     }
   }
 
@@ -272,18 +172,6 @@ class SensorService {
     this.enableBackgroundKeepAlive();
 
     if (Capacitor.isNativePlatform()) {
-      // Belt-and-suspenders with MainActivity's own StepCounterService.start()
-      // call — starting an already-running foreground service is a no-op.
-      StepTracker.startTracking().catch(e => console.warn('StepTracker.startTracking failed:', e));
-      void this.syncFromNativeSources();
-
-      // Health Connect / the native service aren't pushed to us — without this,
-      // the count only ever refreshes when the app is backgrounded and resumed,
-      // which looks broken if you just sit on a screen watching the number.
-      if (!this.nativeSyncInterval) {
-        this.nativeSyncInterval = setInterval(() => void this.syncFromNativeSources(), 30000);
-      }
-
       try {
         this.motionListenerHandle = await Motion.addListener('accel', (event) => {
           this.processAcceleration(event.acceleration, event.accelerationIncludingGravity);
@@ -299,10 +187,6 @@ class SensorService {
 
   public async stopListening() {
     this.isListening = false;
-    if (this.nativeSyncInterval) {
-      clearInterval(this.nativeSyncInterval);
-      this.nativeSyncInterval = null;
-    }
     if (this.motionListenerHandle) {
       try {
         await this.motionListenerHandle.remove();

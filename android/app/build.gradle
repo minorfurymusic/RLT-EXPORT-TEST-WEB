@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
     namespace = "com.reallifetrack.app"
@@ -23,10 +22,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    kotlinOptions {
-        // Must match capacitor.build.gradle's sourceCompatibility/targetCompatibility below.
-        jvmTarget = "21"
-    }
 }
 
 repositories {
@@ -45,11 +40,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-
-    // StepCounterService.kt (Opção A) + StepTrackerPlugin.kt (Opção B)
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinxCoroutinesVersion"
-    implementation "androidx.health.connect:connect-client:$healthConnectVersion"
 }
 
 apply from: 'capacitor.build.gradle'

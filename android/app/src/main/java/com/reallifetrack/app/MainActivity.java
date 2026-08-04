@@ -1,13 +1,5 @@
 package com.reallifetrack.app;
 
-import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
-public class MainActivity extends BridgeActivity {
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        registerPlugin(StepTrackerPlugin.class);
-        super.onCreate(savedInstanceState);
-        StepCounterService.start(this);
-    }
-}
+public class MainActivity extends BridgeActivity {}
