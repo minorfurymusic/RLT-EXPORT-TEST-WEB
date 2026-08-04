@@ -5,6 +5,34 @@ import { useHealth } from '../context/HealthContext';
 import { sensorService } from '../services/sensorService';
 import { locationService } from '../services/locationService';
 import { safeLocalStorage } from '../lib/utils';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+
+// The browser's own Notification.requestPermission() runs inside the
+// WebView's internal permission sandbox — on Android that is NOT reliably
+// wired to the real android.permission.POST_NOTIFICATIONS system permission,
+// so it can get stuck reporting "not granted" forever no matter how many
+// times the user taps Allow. @capacitor/local-notifications' checkPermissions/
+// requestPermissions calls the actual native Android permission API instead.
+async function checkNotificationGranted(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    const { display } = await LocalNotifications.checkPermissions();
+    return display === 'granted';
+  }
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+
+async function requestNotificationGranted(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    const { display } = await LocalNotifications.requestPermissions();
+    return display === 'granted';
+  }
+  if ('Notification' in window) {
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  }
+  return false;
+}
 
 interface SystemPermissionsModalProps {
   isOpen: boolean;
@@ -28,18 +56,21 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
   }, [isOpen]);
 
   const checkCurrentStatus = async () => {
-    // Check Notification status
-    if ('Notification' in window) {
-      setNotificationGranted(Notification.permission === 'granted');
+    try {
+      setNotificationGranted(await checkNotificationGranted());
+    } catch (e) {
+      console.warn('Notification status check notice:', e);
     }
 
-    // Check localStorage saved states
+    // Sensor and location have no equally cheap real-time check on Android, so
+    // they still fall back to the last known result. Notification is NOT read
+    // from here — it was just checked for real above, and a stale "true" from
+    // a previous attempt must never override a real "not granted" result.
     const savedStates = safeLocalStorage.getItem('health_permission_states');
     if (savedStates) {
       try {
         const parsed = JSON.parse(savedStates);
         if (parsed.sensor) setSensorGranted(true);
-        if (parsed.notification) setNotificationGranted(true);
         if (parsed.location) setLocationGranted(true);
       } catch (e) {
         console.error('Error parsing permission states:', e);
@@ -78,13 +109,11 @@ export default function SystemPermissionsModal({ isOpen, onClose }: SystemPermis
     // doesn't belong in this quick sequence. It has its own dedicated
     // "Conectar Health Connect" button in Exercícios (Exercises.tsx).
 
-    // 2. Notification API — waits for the real dialog response.
+    // 2. Notification permission — waits for the real dialog response, via
+    // the native Android API on-device (see requestNotificationGranted above).
     let notificationOk = false;
     try {
-      if ('Notification' in window) {
-        const result = await Notification.requestPermission();
-        notificationOk = result === 'granted';
-      }
+      notificationOk = await requestNotificationGranted();
     } catch (e) {
       console.warn('Notification permission notice:', e);
     }
