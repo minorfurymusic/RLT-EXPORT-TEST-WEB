@@ -17,6 +17,8 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** true when this reply came from the local regex fallback because the real AI call failed (no key, network, CORS...) — surfaced in the UI so a degraded reply is never mistaken for the AI actually understanding the request */
+  degraded?: boolean;
 }
 
 interface ChatSession {
@@ -398,10 +400,16 @@ export default function AIAssistant() {
         if (orchestratorResult.handledLocally && orchestratorResult.responseContent) {
           const fallbackMessages: ChatMessage[] = [
             ...newMessages,
-            { id: (Date.now() + 1).toString(), role: 'assistant', content: orchestratorResult.responseContent }
+            {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: orchestratorResult.responseContent,
+              degraded: true
+            }
           ];
           updateActiveSessionMessages(fallbackMessages);
           setIsTyping(false);
+          console.warn('Cérebro: IA indisponível, resposta veio do modo simplificado local.', aiError);
           return;
         }
         throw aiError; // local fallback couldn't handle it either — surface the original AI error
@@ -861,6 +869,12 @@ export default function AIAssistant() {
                       : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-bl-none'
                   }`}
                 >
+                  {m.degraded && (
+                    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                      <span className="size-1.5 rounded-full bg-amber-500" />
+                      Modo simplificado (IA indisponível no momento)
+                    </div>
+                  )}
                   <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                 </div>
               </motion.div>

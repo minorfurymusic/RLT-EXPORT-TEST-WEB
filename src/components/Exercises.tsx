@@ -9,9 +9,10 @@ import {
   ChevronRight, 
   Plus, 
   Settings, 
-  X, 
-  Play, 
+  X,
+  Play,
   Pause,
+  AlertTriangle,
   Square, 
   Timer, 
   Map, 
@@ -39,6 +40,7 @@ import { EXERCISE_LIBRARY } from '../data/exerciseLibrary';
 import { safeJsonParse, getGoogleGenAI } from '../lib/ai';
 import { sensorService } from '../services/sensorService';
 import { locationService } from '../services/locationService';
+import { nativeStepBridge, StepTrackerStepsResult } from '../services/nativeStepBridge';
 
 export default function Exercises() {
   useRegisterComponentRuntime('Exercises');
@@ -94,6 +96,71 @@ export default function Exercises() {
       setIsTrackingModalOpen(true);
     }
   }, [activeActivity]);
+
+  const [stepData, setStepData] = useState<StepTrackerStepsResult>({
+    steps: 0,
+    lastUpdateMs: 0,
+    isTracking: false,
+    sensorAvailable: false,
+    permissionGranted: false
+  });
+  const [batteryIgnored, setBatteryIgnored] = useState(true);
+  const [isStepBusy, setIsStepBusy] = useState(false);
+  const [stepStateLoaded, setStepStateLoaded] = useState(false);
+  const stepSupported = nativeStepBridge.isSupported();
+
+  const refreshStepState = async () => {
+    if (!stepSupported) return;
+    const [data, ignoring] = await Promise.all([
+      nativeStepBridge.getSteps(),
+      nativeStepBridge.isIgnoringBatteryOptimizations()
+    ]);
+    setStepData(data);
+    setBatteryIgnored(ignoring);
+    setStepStateLoaded(true);
+  };
+
+  useEffect(() => {
+    if (!stepSupported) return;
+    refreshStepState();
+    const interval = setInterval(refreshStepState, 20000);
+    const onFocus = () => refreshStepState();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [stepSupported]);
+
+  const handleEnableStepTracking = async () => {
+    setIsStepBusy(true);
+    try {
+      const granted = await nativeStepBridge.requestPermission();
+      if (!granted) {
+        alert(appLanguage === 'pt-BR'
+          ? 'Permissão negada. Sem ela, o Android não entrega os dados do sensor de passos ao app.'
+          : 'Permission denied. Without it, Android will not deliver step sensor data to the app.');
+        await refreshStepState();
+        return;
+      }
+      await nativeStepBridge.startTracking();
+      await refreshStepState();
+    } finally {
+      setIsStepBusy(false);
+    }
+  };
+
+  const handleRequestBatteryExemption = async () => {
+    setIsStepBusy(true);
+    try {
+      await nativeStepBridge.requestIgnoreBatteryOptimizations();
+      await refreshStepState();
+    } finally {
+      setIsStepBusy(false);
+    }
+  };
 
   const handleRequestPermission = async () => {
     const granted = await requestSensorPermission();
@@ -265,6 +332,58 @@ export default function Exercises() {
                       </div>
                     </div>
                   </motion.div>
+                )}
+
+                {/* Step Counter — native TYPE_STEP_COUNTER foreground service (Android only) */}
+                {stepSupported && stepStateLoaded && (
+                  <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-primary/10 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                          <Walk className="size-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-sm">{appLanguage === 'pt-BR' ? 'Passos Hoje' : 'Steps Today'}</h3>
+                          {!stepData.sensorAvailable ? (
+                            <p className="text-[10px] text-slate-500 font-bold">
+                              {appLanguage === 'pt-BR' ? 'Este aparelho não tem sensor de passos' : 'This device has no step sensor'}
+                            </p>
+                          ) : stepData.isTracking ? (
+                            <p className="text-2xl font-black text-emerald-500 tabular-nums leading-none mt-0.5">
+                              {stepData.steps.toLocaleString()}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                              {appLanguage === 'pt-BR' ? 'Contador desativado' : 'Counter off'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {stepData.sensorAvailable && !stepData.isTracking && (
+                        <button
+                          onClick={handleEnableStepTracking}
+                          disabled={isStepBusy}
+                          className="text-[10px] font-extrabold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-full transition-colors"
+                        >
+                          {appLanguage === 'pt-BR' ? 'Ativar' : 'Enable'}
+                        </button>
+                      )}
+                    </div>
+                    {stepData.isTracking && !batteryIgnored && (
+                      <button
+                        onClick={handleRequestBatteryExemption}
+                        disabled={isStepBusy}
+                        className="mt-3 w-full flex items-center gap-2 text-left bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 disabled:opacity-50"
+                      >
+                        <AlertTriangle className="size-4 text-amber-500 shrink-0" />
+                        <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                          {appLanguage === 'pt-BR'
+                            ? 'A otimização de bateria do Android pode parar a contagem. Toque para permitir que o app rode em segundo plano.'
+                            : "Android's battery optimization can stop the count. Tap to allow the app to run in the background."}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 {/* Scheduled Routines for Today */}

@@ -2,7 +2,16 @@
 
 **Data:** 2026-08-04
 **Autor:** Claude (Anthropic), a pedido do desenvolvedor do RLT
-**Objetivo:** documentar, com base no nosso próprio código/histórico de bugs e em pesquisa externa (documentação oficial Android/Google/OpenAI/Anthropic, fóruns de desenvolvedores, issues públicas), as causas raiz de dois problemas que o app teve: (1) o contador de passos nunca funcionou de forma confiável no dispositivo real, e (2) o "Cérebro" (assistente de IA) não se comporta como esperado. Este documento é uma referência histórica — o contador de passos já foi **removido por completo** do app (ver commit "Remove step counter feature entirely from the app"); o Cérebro continua ativo e as causas abaixo ainda se aplicam.
+**Objetivo:** documentar, com base no nosso próprio código/histórico de bugs e em pesquisa externa (documentação oficial Android/Google/OpenAI/Anthropic, fóruns de desenvolvedores, issues públicas), as causas raiz de dois problemas que o app teve: (1) o contador de passos nunca funcionou de forma confiável no dispositivo real, e (2) o "Cérebro" (assistente de IA) não se comporta como esperado.
+
+## Atualização — correções aplicadas com base neste diagnóstico
+
+Depois deste diagnóstico, o contador de passos foi **reconstruído do zero** e o Cérebro **reconfigurado**, atacando diretamente as causas listadas abaixo:
+
+- **Contador de passos:** novo serviço nativo em Java (`StepCounterService.java`) lendo `Sensor.TYPE_STEP_COUNTER`, com `foregroundServiceType="health"` corretamente declarado e permissão correspondente (item 1.4), fluxo de isenção de otimização de bateria exposto na UI (item 1.3), `BootReceiver` para sobreviver a reboots, baseline persistida em `SharedPreferences` com tratamento de troca de dia e de reboot, e permissões checadas de verdade — sem nenhum `Promise.race` com fallback mentiroso (item 1.6). Health Connect (Opção B) não foi reintroduzido nesta rodada, por depender de uma sincronização (Google Fit → Health Connect) fora do controle do app (item 1.5).
+- **Cérebro:** `CapacitorHttp` foi habilitado no `capacitor.config.json`, o que faz o Android nativo executar as chamadas HTTP em vez do WebView — elimina de raiz o bloqueio de CORS descrito no item 2.1, que era a causa mais provável de a chamada à IA falhar silenciosamente dentro do APK. Além disso, quando a IA genuinamente falha (sem chave, sem internet, etc.) e o app cai no parser local, a resposta agora exibe um aviso visível de "Modo simplificado" no chat — o problema do item 2.2 (usuário não sabia qual dos dois caminhos respondeu) deixou de ser silencioso.
+
+Teste em dispositivo real ainda é necessário para confirmar o comportamento em campo — o texto abaixo permanece como o diagnóstico original, para referência.
 
 ---
 

@@ -14,6 +14,9 @@
     },
     "Motion": {
       "frequency": 100
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   },
   "android": {
